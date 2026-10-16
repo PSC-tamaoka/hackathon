@@ -6,7 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI(title="Hackathon API")
 
 # カンマ区切りで複数指定可。例: CORS_ORIGINS=http://localhost:5173,https://example.com
-origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,"
+                        "https://hackathon-gamma-self.vercel.app").split(",")
 
 app.add_middleware(
     CORSMiddleware,
