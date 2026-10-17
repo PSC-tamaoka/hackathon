@@ -1,28 +1,35 @@
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/AppText";
+import { CreateEventFab } from "@/src/components/CreateEventFab";
 import { EventCalendar } from "@/src/components/EventCalendar";
 import { EventCard, MiniEventCard } from "@/src/components/EventCards";
 import { Icon } from "@/src/components/Icon";
 import { colors, radius, space } from "@/src/constants/theme";
-import { mockEvents } from "@/src/constants/mockEvents";
+import { useEvents } from "@/src/hooks/useEvents";
 import { toDateKey } from "@/src/lib/dates";
 
 export default function HomeScreen() {
   const router = useRouter();
   const today = new Date();
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() });
-  const [selectedKey, setSelectedKey] = useState(() => {
-    // 今日以降で一番近いイベントの日を最初に選ぶ。なければ今日
-    const upcoming = mockEvents.map((e) => e.date).filter((d) => d >= toDateKey(today)).sort();
-    return upcoming[0] ?? toDateKey(today);
-  });
+  const [selectedKey, setSelectedKey] = useState(() => toDateKey(today));
+  const { events, loading, error } = useEvents(cursor.year, cursor.month);
 
-  const eventDates = useMemo(() => new Set(mockEvents.map((e) => e.date)), []);
-  const selectedEvents = mockEvents.filter((e) => e.date === selectedKey);
+  // 最初の読み込み後に、今日以降で一番近いイベントの日を選ぶ。なければ今日のまま
+  const autoSelected = useRef(false);
+  useEffect(() => {
+    if (autoSelected.current || loading) return;
+    autoSelected.current = true;
+    const upcoming = events.map((e) => e.date).filter((d) => d >= toDateKey(today)).sort();
+    if (upcoming[0]) setSelectedKey(upcoming[0]);
+  }, [events, loading]);
+
+  const eventDates = useMemo(() => new Set(events.map((e) => e.date)), [events]);
+  const selectedEvents = events.filter((e) => e.date === selectedKey);
   const monthPrefix = `${cursor.year}-${String(cursor.month + 1).padStart(2, "0")}`;
-  const recommended = mockEvents.filter((e) => e.date.startsWith(monthPrefix));
+  const recommended = events.filter((e) => e.date.startsWith(monthPrefix));
 
   const moveMonth = (delta: number) => {
     const d = new Date(cursor.year, cursor.month + delta, 1);
@@ -35,7 +42,8 @@ export default function HomeScreen() {
   const openEvent = (id: string) => router.push({ pathname: "/events/[id]", params: { id } });
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <>
+      <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.toolbar}>
         <View style={styles.viewToggle}>
           <View style={[styles.toggleBtn, styles.toggleActive]}>
@@ -85,7 +93,17 @@ export default function HomeScreen() {
             {selectedEvents.length}件
           </AppText>
         </View>
-        {selectedEvents.length === 0 ? (
+        {error ? (
+          <View style={styles.empty}>
+            <AppText variant="bodyMd" color={colors.error}>
+              {error}
+            </AppText>
+          </View>
+        ) : loading && events.length === 0 ? (
+          <View style={styles.empty}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : selectedEvents.length === 0 ? (
           <View style={styles.empty}>
             <AppText variant="bodyMd" color={colors.onSurfaceVariant}>
               この日のイベントはありません
@@ -124,13 +142,15 @@ export default function HomeScreen() {
             </AppText>
           </View>
         </View>
-        <Pressable accessibilityRole="button" onPress={() => router.push("/(tabs)/create")} style={styles.bannerBtn}>
+        <Pressable accessibilityRole="button" onPress={() => router.push("/organizer/new")} style={styles.bannerBtn}>
           <AppText variant="labelMd" color={colors.primary}>
             新規作成
           </AppText>
         </Pressable>
       </View>
-    </ScrollView>
+      </ScrollView>
+      <CreateEventFab />
+    </>
   );
 }
 

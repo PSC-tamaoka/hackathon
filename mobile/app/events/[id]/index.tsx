@@ -2,87 +2,129 @@ import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
-import { useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
+import QRCode from "react-native-qrcode-svg";
 import { AppText } from "@/src/components/AppText";
 import { BackHeader } from "@/src/components/AppHeader";
 import { BottomSheet } from "@/src/components/BottomSheet";
 import { Icon, type IconName } from "@/src/components/Icon";
 import { Toast, type ToastState } from "@/src/components/Toast";
-import { EventRally } from "@/src/components/EventRally";
-import { useEventDetail } from "@/src/hooks/useEventDetail";
+import { commonTodos } from "@/src/constants/mockEvents";
 import { images } from "@/src/constants/images";
 import { colors, radius, space } from "@/src/constants/theme";
+import { useEvent } from "@/src/hooks/useEvent";
+import { applyEvent, cancelRegistration, checkTodo, errorMessage, getInviteUrl } from "@/src/lib/api";
 import { formatJaDate, parseDateKey, weekdayLabel } from "@/src/lib/dates";
 
 export default function EventDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  return <EventDetail key={id} id={id} />;
-}
+  const router = useRouter();
+  // invite: 招待リンクから来たときのトークン(招待制のイベントを見る・申し込むのに使う)
+  const { id, invite } = useLocalSearchParams<{ id: string; invite?: string }>();
+  const { event, loading, error, reload } = useEvent(id, invite);
 
-function EventDetail({ id }: { id: string }) {
-  const { event, participation, loading, loadError, saving, retry, complete, setRegistered } = useEventDetail(id);
-  const registered = participation.registered;
-
+  const [done, setDone] = useState<Set<string>>(() => new Set());
   const [shareOpen, setShareOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const [rsvpOpen, setRsvpOpen] = useState(false);
-  const [rsvpError, setRsvpError] = useState("");
+  const [registered, setRegistered] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
+  const hideToast = useCallback(() => setToast(null), []);
 
-  if (loading || loadError) return (
-    <View style={{ flex: 1 }}>
-      <BackHeader title="Event Detail" />
-      <View style={[styles.notFound, { gap: 16, padding: 24 }]}>
-        {loading ? <><ActivityIndicator color={colors.primary} /><AppText>イベント情報を読み込み中…</AppText></> : <>
-          <AppText>イベント情報・参加情報を読み込めませんでした。</AppText>
-          <Pressable accessibilityRole="button" onPress={retry} style={styles.rsvpBtn}><AppText color={colors.onPrimary}>再試行</AppText></Pressable>
-        </>}
-      </View>
-    </View>
-  );
+  // 読み込んだ内容(自分の出欠・TODOのチェック)を画面に反映する
+  useEffect(() => {
+    if (!event) return;
+    setRegistered(event.isRegistered ?? false);
+    setDone(new Set(event.checkedTodoIds ?? []));
+  }, [event]);
 
   if (!event) {
     return (
       <View style={{ flex: 1 }}>
         <BackHeader title="Event Detail" />
         <View style={styles.notFound}>
-          <AppText variant="bodyLg" color={colors.onSurfaceVariant}>
-            イベントが見つかりません
-          </AppText>
+          {loading ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : (
+            <AppText variant="bodyLg" color={colors.onSurfaceVariant}>
+              {error ?? "イベントが見つかりません"}
+            </AppText>
+          )}
         </View>
       </View>
     );
   }
 
-  const shareUrl = Linking.createURL(`/events/${event.id}`);
+  const linkToShare = shareUrl ?? Linking.createURL(`/events/${event.id}`);
+  const percent = Math.round((done.size / commonTodos.length) * 100);
   const d = parseDateKey(event.date);
   const dateLabel = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日(${weekdayLabel(d)})`;
 
-  const changeRegistration = async (next: boolean) => {
-    setRsvpError("");
+  const showError = (e: unknown) => setToast({ heading: "できませんでした", body: errorMessage(e), icon: "warning" });
+
+  // TODOのチェック(参加登録した人が、イベント当日だけ)。先に画面を変えて、失敗したら戻す
+  const toggleTodo = async (todoId: string) => {
+    if (!registered) {
+      setToast({ heading: "参加登録が必要です", body: "参加登録すると当日のTODOをチェックできます。", icon: "info" });
+      return;
+    }
+    const checked = !done.has(todoId);
+    const before = done;
+    const next = new Set(done);
+    if (checked) next.add(todoId);
+    else next.delete(todoId);
+    setDone(next);
     try {
-      await setRegistered(next);
-      setRsvpOpen(false);
+      setDone(new Set(await checkTodo(event.id, todoId, checked)));
+    } catch (e) {
+      setDone(before);
+      showError(e);
+    }
+  };
+
+  // 共有シートを開くときに招待リンクを用意する(招待ページ /invite/<token> へのリンク)
+  const openShare = async () => {
+    setShareOpen(true);
+    if (shareUrl) return;
+    try {
+      setShareUrl(await getInviteUrl(event.id));
     } catch {
-      setRsvpError("保存できませんでした。出欠状態は変更していません。もう一度お試しください。");
+      // 招待リンクを作れないとき(招待制で権限がない等)はイベントのリンクで代用
+    }
+  };
+
+  const changeRsvp = async (join: boolean) => {
+    setRsvpOpen(false);
+    if (join === registered || busy) return;
+    setBusy(true);
+    try {
+      if (join) await applyEvent(event.id, invite);
+      else await cancelRegistration(event.id);
+      await reload();
+      setToast(
+        join
+          ? { heading: "参加登録しました", body: "当日お会いできるのを楽しみにしています。", icon: "celebration" }
+          : { heading: "参加をとりやめました", body: "またのご参加をお待ちしています。", icon: "event-busy" },
+      );
+    } catch (e) {
+      showError(e);
+    } finally {
+      setBusy(false);
     }
   };
 
   const copyLink = async () => {
-    try {
-      await Clipboard.setStringAsync(shareUrl);
-      setShareOpen(false);
-      setToast({ heading: "コピーしました", body: "リンクをクリップボードにコピーしました。", icon: "content-copy" });
-    } catch {
-      setShareOpen(false);
-      setToast({ heading: "コピーできません", body: "もう一度お試しください。", icon: "warning" });
-    }
+    await Clipboard.setStringAsync(linkToShare);
+    setShareOpen(false);
+    setToast({ heading: "コピーしました", body: "リンクをクリップボードにコピーしました。", icon: "content-copy" });
   };
   const shareVia = async () => {
     setShareOpen(false);
     try {
-      await Share.share({ message: `${event.title}\n${formatJaDate(event.date)}\n${shareUrl}` });
+      await Share.share({ message: `${event.title}\n${formatJaDate(event.date)}\n${linkToShare}` });
     } catch {
       setToast({ heading: "共有できません", body: "もう一度お試しください。", icon: "warning" });
     }
@@ -101,7 +143,7 @@ function EventDetail({ id }: { id: string }) {
               </AppText>
             </View>
           </View>
-          <Pressable accessibilityRole="button" onPress={() => setShareOpen(true)} style={styles.shareBtn}>
+          <Pressable accessibilityRole="button" onPress={openShare} style={styles.shareBtn}>
             <Icon name="share" size={18} color={colors.primary} />
             <AppText variant="labelLg" color={colors.primary}>
               共有
@@ -110,7 +152,7 @@ function EventDetail({ id }: { id: string }) {
         </View>
 
         <View style={styles.hero}>
-          <Image source={{ uri: event.cover }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          <Image source={{ uri: images.eventHero }} style={StyleSheet.absoluteFill} contentFit="cover" />
           <LinearGradient colors={["transparent", "rgba(40,48,68,0.9)"]} style={StyleSheet.absoluteFill} />
           <View style={styles.heroText}>
             <View style={styles.heroTag}>
@@ -166,12 +208,72 @@ function EventDetail({ id }: { id: string }) {
           <View style={styles.mapChip}>
             <Icon name="near-me" size={14} color={colors.tertiary} />
             <AppText variant="labelSm" color={colors.onSurface}>
-              {event.place}
+              渋川海岸・松林エリア隣接
             </AppText>
           </View>
         </View>
 
-        <EventRally event={event} participation={participation} saving={saving} complete={complete} />
+        <View style={[styles.card, { backgroundColor: colors.surfaceContainerLow, gap: 16 }]}>
+          <View style={{ gap: 4 }}>
+            <View style={styles.todoHead}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Icon name="task-alt" size={24} color={colors.primary} />
+                <AppText variant="headlineSm">当日のTODOリスト</AppText>
+              </View>
+              <View style={styles.count}>
+                <AppText variant="labelLg" color={colors.onPrimaryFixed}>
+                  {done.size}/{commonTodos.length} 完了
+                </AppText>
+              </View>
+            </View>
+            <View style={styles.note}>
+              <Icon name="info" size={18} color={colors.primary} />
+              <AppText variant="bodySm" color={colors.onSurfaceVariant} style={{ flex: 1 }}>
+                ※全イベント参加者共通のやることリストです（登録・追加は不要）
+              </AppText>
+            </View>
+          </View>
+
+          <View style={{ gap: 6 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <AppText variant="labelSm" color={colors.onSurfaceVariant}>
+                達成度
+              </AppText>
+              <AppText variant="labelSm" color={colors.onSurfaceVariant}>
+                {percent}%
+              </AppText>
+            </View>
+            <View style={styles.track}>
+              <View style={[styles.fill, { width: `${percent}%` }]} />
+            </View>
+          </View>
+
+          <View style={{ gap: 8 }}>
+            {commonTodos.map((todo) => {
+              const checked = done.has(todo.id);
+              return (
+                <Pressable
+                  key={todo.id}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked }}
+                  onPress={() => toggleTodo(todo.id)}
+                  style={styles.todo}
+                >
+                  <View style={[styles.box, checked && styles.boxChecked]}>
+                    {checked && <Icon name="check" size={18} color={colors.onPrimary} />}
+                  </View>
+                  <AppText
+                    variant="bodyMd"
+                    color={checked ? colors.onSurfaceVariant : colors.onSurface}
+                    style={[{ flex: 1 }, checked && { textDecorationLine: "line-through" }]}
+                  >
+                    {todo.text}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
 
         <View style={[styles.card, { gap: 12 }]}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -179,7 +281,7 @@ function EventDetail({ id }: { id: string }) {
             <AppText variant="headlineSm">企画の見どころ</AppText>
           </View>
           <AppText variant="bodyMd" color={colors.onSurfaceVariant} style={{ lineHeight: 24 }}>
-            {event.description}
+            学生時代に汗を流した渋川の海を望みながら、夕暮れの潮風とともに思い出を語り合います。未経験の方やご家族連れの参加も歓迎です。防寒着と歩きやすい靴でお越しください。
           </AppText>
         </View>
 
@@ -198,13 +300,35 @@ function EventDetail({ id }: { id: string }) {
               定員まであと{event.remaining}名
             </AppText>
           </View>
-          <Pressable accessibilityRole="button" disabled={saving} onPress={() => { setRsvpError(""); setRsvpOpen(true); }} style={styles.rsvpBtn}>
-            <Icon name="how-to-reg" size={20} color={colors.onPrimary} />
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy}
+            onPress={() => setRsvpOpen(true)}
+            style={[styles.rsvpBtn, busy && { opacity: 0.6 }]}
+          >
+            {busy ? (
+              <ActivityIndicator color={colors.onPrimary} />
+            ) : (
+              <Icon name="how-to-reg" size={20} color={colors.onPrimary} />
+            )}
             <AppText variant="headlineSm" color={colors.onPrimary}>
               出欠状況の確認・変更
             </AppText>
           </Pressable>
         </View>
+
+        {event.isOrganizer && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push({ pathname: "/organizer/[id]/invite", params: { id: event.id } })}
+            style={styles.organizerBtn}
+          >
+            <Icon name="forward-to-inbox" size={20} color={colors.primary} />
+            <AppText variant="labelLg" color={colors.primary}>
+              主催者メニュー：招待リンク・QRコード
+            </AppText>
+          </Pressable>
+        )}
       </ScrollView>
 
       <BottomSheet visible={shareOpen} onClose={() => setShareOpen(false)}>
@@ -226,18 +350,40 @@ function EventDetail({ id }: { id: string }) {
           <ShareAction icon="chat" label="LINEで送る" bg={colors.tertiaryContainer} fg={colors.onTertiaryContainer} onPress={shareVia} />
           <ShareAction icon="tag" label="SNSポスト" bg={colors.inverseSurface} fg={colors.inverseOnSurface} onPress={shareVia} />
           <ShareAction icon="content-copy" label="URLコピー" bg={colors.primaryFixed} fg={colors.onPrimaryFixed} onPress={copyLink} />
+          <ShareAction
+            icon="qr-code-2"
+            label="QRコード"
+            bg={colors.secondaryFixed}
+            fg={colors.onSecondaryFixed}
+            onPress={() => {
+              setShareOpen(false);
+              setQrOpen(true);
+            }}
+          />
         </View>
       </BottomSheet>
 
-      <BottomSheet visible={rsvpOpen} onClose={() => { if (!saving) setRsvpOpen(false); }}>
+      <BottomSheet visible={qrOpen} onClose={() => setQrOpen(false)}>
+        <View style={styles.sheetHead}>
+          <AppText variant="headlineSm">招待QRコード</AppText>
+          <Pressable accessibilityLabel="閉じる" onPress={() => setQrOpen(false)} style={styles.closeBtn}>
+            <Icon name="close" size={20} />
+          </Pressable>
+        </View>
+        <View style={styles.qrBox}>
+          <QRCode value={linkToShare} size={200} />
+        </View>
+        <AppText variant="bodySm" color={colors.onSurfaceVariant} style={{ textAlign: "center" }}>
+          スマホのカメラで読み取ると、このイベントの招待ページが開きます。
+        </AppText>
+      </BottomSheet>
+
+      <BottomSheet visible={rsvpOpen} onClose={() => setRsvpOpen(false)}>
         <AppText variant="headlineSm">出欠状況の変更</AppText>
-        {!!rsvpError && <AppText accessibilityRole="alert" color={colors.error}>{rsvpError}</AppText>}
         <View style={{ gap: 10 }}>
           <Pressable
             accessibilityRole="button"
-            disabled={saving}
-            accessibilityState={{ disabled: saving, busy: saving }}
-            onPress={() => changeRegistration(true)}
+            onPress={() => changeRsvp(true)}
             style={[styles.choice, registered && styles.choiceActive]}
           >
             <Icon name="how-to-reg" size={20} color={colors.primary} />
@@ -245,9 +391,7 @@ function EventDetail({ id }: { id: string }) {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            disabled={saving}
-            accessibilityState={{ disabled: saving, busy: saving }}
-            onPress={() => changeRegistration(false)}
+            onPress={() => changeRsvp(false)}
             style={[styles.choice, !registered && styles.choiceActive]}
           >
             <Icon name="close" size={20} color={colors.error} />
@@ -256,7 +400,7 @@ function EventDetail({ id }: { id: string }) {
         </View>
       </BottomSheet>
 
-      <Toast toast={toast} onHide={() => setToast(null)} bottom={24} />
+      <Toast toast={toast} onHide={hideToast} bottom={24} />
     </View>
   );
 }
@@ -370,6 +514,36 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     backgroundColor: "rgba(250,248,255,0.9)",
   },
+  todoHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  count: { paddingHorizontal: 10, paddingVertical: 2, borderRadius: radius.full, backgroundColor: colors.primaryFixed },
+  note: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    padding: 10,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceContainerHigh,
+  },
+  track: { height: 8, borderRadius: 4, backgroundColor: colors.surfaceContainer, overflow: "hidden" },
+  fill: { height: "100%", backgroundColor: colors.primary, borderRadius: 4 },
+  todo: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceContainerLowest,
+  },
+  box: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceContainerHighest,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  boxChecked: { backgroundColor: colors.primary },
   rsvp: {
     padding: 16,
     borderRadius: radius.card,
@@ -423,4 +597,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceContainerLow,
   },
   choiceActive: { backgroundColor: colors.primaryFixed },
+  organizerBtn: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: radius.full,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+  },
+  qrBox: {
+    alignSelf: "center",
+    padding: 16,
+    borderRadius: radius.md,
+    backgroundColor: "#ffffff",
+  },
 });

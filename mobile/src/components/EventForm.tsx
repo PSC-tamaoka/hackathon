@@ -1,9 +1,11 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { images } from "@/src/constants/images";
 import { colors, fonts, radius, space } from "@/src/constants/theme";
+import { createEvent, errorMessage } from "@/src/lib/api";
 import { parseDateKey, toDateKey, weekdayLabel } from "@/src/lib/dates";
 import type { EventScope, RainPolicy } from "@/src/types/event";
 import { AppText } from "./AppText";
@@ -11,6 +13,7 @@ import { Icon, type IconName } from "./Icon";
 import { Toast, type ToastState } from "./Toast";
 
 const DEFAULT_PLACE = "岡山県渋川青年の家（玉野市渋川二丁目7番1号）";
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const TITLE_MAX = 40;
 const TITLE_PRESETS = [
   "⛵ カッター漕艇＆浜辺の夕陽座談会",
@@ -53,9 +56,11 @@ function upcomingDays(count: number) {
   });
 }
 
-/** イベント作成フォーム(O-02)。入力内容は保存されず、確認用の通知を出すだけ */
+/** イベント作成フォーム(O-02)。保存すると作った人が主催者になる */
 export function EventForm() {
+  const router = useRouter();
   const days = upcomingDays(3);
+  const [busy, setBusy] = useState(false);
   const [title, setTitle] = useState("");
   const [dateKey, setDateKey] = useState(days[0].key);
   const [customDate, setCustomDate] = useState("");
@@ -94,18 +99,52 @@ export function EventForm() {
     setPlaceDetail(placeDetail ? `${placeDetail} / ${text}` : text);
   };
 
-  const submit = () => {
+  const save = async (draft: boolean) => {
     const name = title.trim();
     if (!name) {
       setToast({ heading: "入力が必要です", body: "イベント名を入力してください。", icon: "warning" });
       return;
     }
-    if (scope === "closed") {
-      setToast({ heading: "イベント保存完了", body: "招待コードを発行しました。招待設定画面へ遷移します。", icon: "send" });
-    } else {
-      setToast({ heading: "公開完了！", body: `「${name}」が全員カレンダーに公開されました。`, icon: "celebration" });
+    if (!TIME_PATTERN.test(startTime) || !TIME_PATTERN.test(endTime)) {
+      setToast({ heading: "時刻を確認してください", body: "開始・終了時刻は 15:30 のように入力してください。", icon: "warning" });
+      return;
+    }
+    if (endTime <= startTime) {
+      setToast({ heading: "時刻を確認してください", body: "終了時刻は開始時刻より後にしてください。", icon: "warning" });
+      return;
+    }
+    if (busy) return;
+    setBusy(true);
+    try {
+      const id = await createEvent({
+        title: name,
+        date: dateKey,
+        startTime,
+        endTime,
+        place: place.trim() || DEFAULT_PLACE,
+        placeDetail: placeDetail.trim(),
+        capacity,
+        scope,
+        rainPolicy: rain,
+        tags: [...tags],
+        draft,
+      });
+      if (draft) {
+        setToast({ heading: "下書き保存", body: "下書きとして保存しました（カレンダーには自分にだけ表示されます）。", icon: "bookmark" });
+      } else if (scope === "closed") {
+        setToast({ heading: "イベント保存完了", body: "招待リンクを発行します。招待設定画面へ移動します。", icon: "send" });
+        router.push({ pathname: "/organizer/[id]/invite", params: { id } });
+      } else {
+        setToast({ heading: "公開完了！", body: `「${name}」が全員のカレンダーに公開されました。`, icon: "celebration" });
+        router.push({ pathname: "/events/[id]", params: { id } });
+      }
+    } catch (e) {
+      setToast({ heading: "保存できませんでした", body: errorMessage(e), icon: "warning" });
+    } finally {
+      setBusy(false);
     }
   };
+  const submit = () => save(false);
 
   return (
     <View style={{ flex: 1 }}>
@@ -378,8 +417,17 @@ export function EventForm() {
         </Section>
 
         <View style={{ gap: 12, paddingTop: 8 }}>
-          <Pressable accessibilityRole="button" onPress={submit} style={styles.submit}>
-            <Icon name={info.submitIcon} size={22} color={colors.onPrimary} />
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy}
+            onPress={submit}
+            style={[styles.submit, busy && { opacity: 0.6 }]}
+          >
+            {busy ? (
+              <ActivityIndicator color={colors.onPrimary} />
+            ) : (
+              <Icon name={info.submitIcon} size={22} color={colors.onPrimary} />
+            )}
             <AppText variant="labelLg" color={colors.onPrimary} style={{ fontFamily: fonts.bold }}>
               {info.submitLabel}
             </AppText>
@@ -387,7 +435,8 @@ export function EventForm() {
           <View style={{ flexDirection: "row", gap: 8 }}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => setToast({ heading: "下書き保存", body: "編集内容を下書きとして保存しました。", icon: "bookmark" })}
+              disabled={busy}
+              onPress={() => save(true)}
               style={styles.draft}
             >
               <Icon name="bookmark-border" size={18} />
