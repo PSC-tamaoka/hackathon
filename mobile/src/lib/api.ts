@@ -144,8 +144,9 @@ export type SignUpInput = {
   password: string;
   name: string;
   ageGroup: string;
-  residence: string;
-  memories: string;
+  city: string;
+  experienceYear: number;
+  schoolName: string;
 };
 
 function authMessage(message: string): string {
@@ -165,12 +166,14 @@ export async function signUp(input: SignUpInput): Promise<void> {
     email: input.email,
     password: input.password,
     options: {
-      // データベースのトリガーがこの値から users の行を作る
+      // データベースのトリガーがこの値から users / shibukawa_experiences を作る
       data: {
         name: input.name,
+        nickname: input.name,
         age_group: input.ageGroup,
-        residence: input.residence,
-        memories: input.memories,
+        city: input.city,
+        experience_year: input.experienceYear,
+        school_name: input.schoolName,
       },
     },
   });

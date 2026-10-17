@@ -85,15 +85,8 @@ alter table public.push_tokens           enable row level security;
 -- 3. ポリシー
 -- ---------------------------------------------------------------------
 
--- users：自分の行だけ（作成は登録時のトリガーが行う）
-create policy "自分のプロフィールを見る" on public.users
-  for select to authenticated
-  using (id = (select auth.uid()));
+-- users のポリシー（自分の行だけ）は 20261017190000_create_users.sql で設定済み
 
-create policy "自分のプロフィールを更新する" on public.users
-  for update to authenticated
-  using (id = (select auth.uid()))
-  with check (id = (select auth.uid()));
 
 -- events：見てよいものだけ。作成は誰でも（作った人が主催者）
 -- （作成直後の行も判定できるよう、関数に行を探させず列で直接判定する）
@@ -171,8 +164,8 @@ revoke insert, update, delete on
 from authenticated;
 revoke select on public.invitation_deliveries from authenticated;
 
--- users：is_admin・email は自分で変えられない
-grant update (name, age_group, residence, memories, notify_email, notify_push)
+-- users：is_admin・email は自分で変えられない（列は create_users.sql の設計に合わせる）
+grant update (name, nickname, city, age_group, notify_email, notify_push)
   on public.users to authenticated;
 
 -- events：主催者が入力する列だけ（organizer_id・is_hidden・全体招待の進み具合は除く）

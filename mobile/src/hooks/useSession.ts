@@ -17,5 +17,5 @@ export function useSession() {
     return () => data.subscription.unsubscribe();
   }, []);
 
-  return { ready, session, signedIn: session !== null };
+  return { ready, session, signedIn: session !== null, loading: !ready };
 }

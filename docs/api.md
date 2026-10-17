@@ -27,6 +27,12 @@ RPC のエラーは日本語の文言で返るので、`error.message` をその
 | get_invite_status | p_event_id | 招待の状況(公開形式・全体招待メールの送信予定日と件数・リンクが開かれた回数・参加登録数) | 主催者 |
 | claim_due_all_invites ほか4つ | — | 全体招待メールの送信処理用(下の send-invitation が使う) | service_role のみ |
 
+### 認証・管理者(`users` マグレーション)
+
+| 名前 | 引数 | 説明 | 呼べる人 |
+|---|---|---|---|
+| is_admin | — | 管理者判定(users.is_admin。アプリの管理者チェックと、users などの RLS からも使う) | ログイン済み |
+
 イベントの作成・更新は RPC を使わず、アプリから `events` テーブルへ直接書く(RLS で主催者に限定)。
 
 ## Edge Functions(`supabase/functions/`)
@@ -36,3 +42,9 @@ RPC のエラーは日本語の文言で返るので、`error.message` をその
 | send-invitation | 全体招待メール。公開形式がオープンのイベントについて、開催14日前になったら会員全員(メール受信を許可した人)へ送る。1日の上限を超えた分は翌日に続きから送り、同じ人に二度は送らない | pg_cron(毎日9:00。`supabase/cron.sql`) |
 | unsubscribe | 招待メールの配信停止リンクの受け口(署名付き) | メール本文のリンク |
 | send-notification | 申込完了メールなど(未着手) | — |
+
+### 未着手のRPC
+
+| 名前 | 説明 | 優先度 |
+|---|---|---|
+| stamp_in | 押印(開催時間内・申込者本人・未押印を確認して stamps に追加) | Must |

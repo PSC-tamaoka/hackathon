@@ -14,10 +14,11 @@
 | ログイン・新規登録(P-01 と P-02 の入力を1画面にまとめたデザイン) | `app/(auth)/login.tsx` | メール＋パスワード(Supabase Auth) |
 | ホーム(カレンダー)P-03 | `app/(tabs)/index.tsx` | `list_events` |
 | イベント詳細 P-04(当日TODOリスト・出欠・共有/QRつき) | `app/events/[id]/index.tsx` | `get_event` `apply_event` `cancel_registration` `check_todo` `create_invite_link` |
-| イベント作成 O-02(下タブ「イベント作成」から開く) | `app/(tabs)/create.tsx` + `src/components/EventForm.tsx` | `events` へ直接 insert |
+| イベント作成 O-02(管理者のみ。ホーム右下のFABから開く) | `app/organizer/new.tsx` + `src/components/EventForm.tsx` | `events` へ直接 insert |
 | 招待の設定 O-03(招待リンク・QR・全体招待メールの状況) | `app/organizer/[id]/invite.tsx` | `create_invite_link` `get_invite_status` |
 | 招待ページ(招待リンク・QRを開いたとき。ログイン前でも見られる) | `app/invite/[token].tsx` | `get_invite` `apply_event` |
-| お知らせ・マイページ(デザイン案なし。「準備中」表示) | `app/(tabs)/announcements.tsx` `app/(tabs)/mypage.tsx` | — |
+| お知らせ(「準備中」表示) | `app/(tabs)/announcements.tsx` | — |
+| マイページ(自分のプロフィール・ログアウト) | `app/(tabs)/mypage.tsx` | `users` を直接取得 |
 
 デザイン案が仕様書と違う点は、デザイン案を優先して作った(バックエンドもデザイン案に合わせた)。
 
@@ -49,15 +50,16 @@
 | `app/(auth)/` | `_layout.tsx` ★ `login.tsx` ★ | P-01 ログイン・新規登録 |
 | `app/(onboarding)/` | `_layout.tsx` ★ `profile.tsx` ★ | P-02 初回プロフィール・渋川経験 |
 | `app/(onboarding)/` | `notification-permission.tsx` ★ | 通知許可の説明画面(P-02 の後) |
-| `app/(tabs)/` | `_layout.tsx` ★ | 下タブ(ホーム/マイページ) |
+| `app/(tabs)/` | `_layout.tsx` ★ | 下タブ(ホーム/お知らせ/マイページ) |
 | `app/(tabs)/` | `index.tsx` ★ | P-03 ホーム(月カレンダー) |
 | `app/(tabs)/` | `mypage.tsx` ★ | P-06 マイページ |
 | `app/events/[id]/` | `index.tsx` ★ | P-04 イベント詳細 |
 | `app/events/[id]/` | `apply.tsx` | P-05 申込フォーム(デザイン案では詳細画面の「出欠」シートで申し込むので不要) |
 | `app/events/[id]/` | `stamps.tsx` | P-07 スタンプ台紙(デザイン案では詳細画面の「当日のTODOリスト」に置き換え。不要) |
 | `app/events/[id]/` | `complete.tsx` | P-09 コンプリート(TODOを全部チェックしたときの画面。Should) |
-| `app/organizer/` | `_layout.tsx` ★ `index.tsx` ★ | O-01 主催者ダッシュボード |
-| `app/organizer/` | `new.tsx` ★ | O-02 イベント作成 |
+| `app/organizer/` | `_layout.tsx` ★ | 管理者ゲート(非管理者は (tabs) へ戻す。organizer 配下は管理者のみ) |
+| `app/organizer/` | `index.tsx` ★ | O-01 主催者ダッシュボード |
+| `app/organizer/` | `new.tsx` ★ | O-02 イベント作成(管理者のみ。FABから開く) |
 | `app/organizer/[id]/` | `edit.tsx` | O-02 イベント編集 |
 | `app/organizer/[id]/` | `invite.tsx` ★ | O-03 招待の設定(招待リンク・QR・全体招待メールの状況) |
 | `app/invite/` | `[token].tsx` ★ | 招待ページ(招待リンク・QRコードの行き先。ログイン前でも見られる) |
@@ -74,6 +76,7 @@
 |---|---|
 | `Button.tsx` ★ | 大きめの共通ボタン(画面下に置く主操作用) |
 | `TextField.tsx` ★ | 共通入力欄(本文16px以上) |
+| `CreateEventFab.tsx` ★ | 管理者(is_admin)のときだけ出るホーム右下の作成ボタン |
 | `EventCalendar.tsx` ★ | 月カレンダー+ドット(react-native-calendars) |
 | `EventPickerSheet.tsx` ★ | 同日に複数イベントがあるときの下から出るシート |
 | `EventCard.tsx` ★ | イベントの要約表示 |
@@ -137,6 +140,7 @@
 | `20261017200100_enable_rls.sql` ★ | 全テーブルの RLS と列の権限(個人情報は本人・主催者に限定。申込・TODO・招待は RPC 経由だけ) |
 | `20261017200200_rpc_events.sql` ★ | イベント一覧・詳細・参加・とりやめ・TODOチェックの RPC |
 | `20261017200300_rpc_invitations.sql` ★ | 招待リンク・招待ページ・招待状況・全体招待メール送信用の RPC |
+| `20261017212231_create_users.sql` ★ | users・shibukawa_experiences・登録トリガー(handle_new_user)・RLS・is_admin()。SQL Editor で適用 |
 | `storage_buckets` | カバー画像のバケット(使う場合) |
 
 ### `seed.sql`(デモ用データ)
