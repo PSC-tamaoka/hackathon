@@ -1,4 +1,4 @@
-import type { EventSummary, TodoItem } from "@/src/types/event";
+import type { EventSummary } from "@/src/types/event";
 import { images } from "./images";
 
 // 画面確認用の仮データ(バックエンド接続までの間だけ使う)。
@@ -63,14 +63,17 @@ export const mockEvents: EventSummary[] = [
   },
 ];
 
-/** 全イベント共通の当日TODOリスト(登録・追加は不要) */
-export const commonTodos: TodoItem[] = [
-  { id: "t1", text: "受付にてチェックイン（名札と思い出シールの受け取り）" },
-  { id: "t2", text: "渋川海岸へ移動・当時の櫂（かい）とカッターボートの見学" },
-  { id: "t3", text: "「語らいのタネ」カードを引いて、初対面の同窓生・OBOGと会話する" },
-  { id: "t4", text: "砂浜でみんなで夕陽を眺めながら思い出トーク（自由歓談）" },
-  { id: "t5", text: "記念写真の撮影＆アンケート回答" },
-];
+// DB接続までの画面確認用。日本時間の本日開催なので、毎日ラリーを試せる。
+mockEvents.push({
+  ...mockEvents[1],
+  id: "rally-demo",
+  title: "【デモ】渋川の思い出スタンプラリー",
+  description: "カッターや地引網、仲間との語らい。5つの体験で、渋川の思い出をつなぐデモイベントです。",
+  date: new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10),
+  startTime: "00:00",
+  endTime: "23:59",
+  receptionNote: "画面確認用のモックイベント",
+});
 
 export function findEvent(id: string | undefined): EventSummary | undefined {
   return mockEvents.find((e) => e.id === id);
