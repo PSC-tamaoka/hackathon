@@ -16,12 +16,14 @@ export type Profile = {
 
 /** 自分の users 行。取得失敗やテーブル未作成のときは isAdmin=false(安全側) */
 export function useProfile() {
-  const { session } = useSession();
+  const { session, loading: sessionLoading } = useSession();
   const userId = session?.user.id;
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // セッション判別前に「未ログイン」と決めると、organizer ゲートが管理者でも弾いてしまう
+    if (sessionLoading) return;
     let cancelled = false;
     if (!userId) {
       setProfile(null);
@@ -43,7 +45,7 @@ export function useProfile() {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, sessionLoading]);
 
   return { profile, loading, isAdmin: profile?.is_admin ?? false };
 }
