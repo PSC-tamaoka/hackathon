@@ -89,35 +89,6 @@ export default function LoginScreen() {
   const showErrorToast = (heading: string, body: string) =>
     setToast({ heading, body, icon: "error" });
 
-  // テーブル未整備でも登録を止めない。値は signUp の metadata にも残っている
-  const saveProfile = async (userId: string) => {
-    try {
-      const [{ error: usersError }, { error: experiencesError }] = await Promise.all([
-        supabase.from("users").upsert({
-          id: userId,
-          email,
-          name: name.trim(),
-          nickname: name.trim(),
-          city: residence,
-          age_group: age,
-          is_admin: false,
-          notify_email: true,
-          notify_push: true,
-        }),
-        supabase.from("shibukawa_experiences").insert({
-          user_id: userId,
-          year: Number(year),
-          school_name: school.trim(),
-        }),
-      ]);
-      if (usersError || experiencesError) {
-        console.warn("プロフィール保存に失敗しました:", usersError ?? experiencesError);
-      }
-    } catch (e) {
-      console.warn("プロフィール保存に失敗しました:", e);
-    }
-  };
-
   // Google OAuth は未実装。ボタンは見た目だけ残して案内する
   const showGooglePending = () =>
     setToast({
@@ -151,8 +122,8 @@ export default function LoginScreen() {
           },
         });
         if (error) return showErrorToast("登録できませんでした", errorText(error.message));
-        if (data.user && data.session) {
-          await saveProfile(data.user.id);
+        if (data.session) {
+          // users / shibukawa_experiences は DBトリガー(handle_new_user)が作る
           router.replace("/(tabs)");
         } else {
           // ダッシュボードで確認メールが有効な場合のフォールバック
