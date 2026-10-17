@@ -1,28 +1,29 @@
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/AppText";
 import { EventCalendar } from "@/src/components/EventCalendar";
 import { EventCard, MiniEventCard } from "@/src/components/EventCards";
 import { Icon } from "@/src/components/Icon";
 import { colors, radius, space } from "@/src/constants/theme";
-import { mockEvents } from "@/src/constants/mockEvents";
+import { useEvents } from "@/src/hooks/useEvents";
 import { toDateKey } from "@/src/lib/dates";
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { events, loading, error, reload } = useEvents();
   const today = new Date();
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() });
-  const [selectedKey, setSelectedKey] = useState(() => {
-    // 今日以降で一番近いイベントの日を最初に選ぶ。なければ今日
-    const upcoming = mockEvents.map((e) => e.date).filter((d) => d >= toDateKey(today)).sort();
-    return upcoming[0] ?? toDateKey(today);
-  });
+  const [picked, setPicked] = useState<string | null>(null);
+  // 操作するまでは、今日以降で一番近いイベントの日を選んでおく。なければ今日
+  const selectedKey =
+    picked ?? events.map((e) => e.date).filter((d) => d >= toDateKey(today)).sort()[0] ?? toDateKey(today);
+  const setSelectedKey = setPicked;
 
-  const eventDates = useMemo(() => new Set(mockEvents.map((e) => e.date)), []);
-  const selectedEvents = mockEvents.filter((e) => e.date === selectedKey);
+  const eventDates = useMemo(() => new Set(events.map((e) => e.date)), [events]);
+  const selectedEvents = events.filter((e) => e.date === selectedKey);
   const monthPrefix = `${cursor.year}-${String(cursor.month + 1).padStart(2, "0")}`;
-  const recommended = mockEvents.filter((e) => e.date.startsWith(monthPrefix));
+  const recommended = events.filter((e) => e.date.startsWith(monthPrefix));
 
   const moveMonth = (delta: number) => {
     const d = new Date(cursor.year, cursor.month + delta, 1);
@@ -66,6 +67,15 @@ export default function HomeScreen() {
           </Pressable>
         </View>
       </View>
+
+      {loading && <ActivityIndicator color={colors.primary} />}
+      {error && (
+        <Pressable accessibilityRole="button" onPress={reload} style={styles.empty}>
+          <AppText variant="bodyMd" color={colors.onSurfaceVariant}>
+            {error}(タップで再読み込み)
+          </AppText>
+        </Pressable>
+      )}
 
       <EventCalendar
         year={cursor.year}

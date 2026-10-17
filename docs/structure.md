@@ -11,7 +11,7 @@
 | 画面 | ファイル |
 |---|---|
 | ログイン・新規登録(P-01 と P-02 の入力を1画面にまとめたデザイン) | `app/(auth)/login.tsx` |
-| ホーム(カレンダー)P-03 | `app/(tabs)/index.tsx` |
+| ホーム(カレンダー)P-03(予定は `src/hooks/useEvents.ts` で Supabase `events` から取得。`.env` 未設定なら仮データ) | `app/(tabs)/index.tsx` |
 | イベント詳細 P-04(当日TODOリスト・共有つき) | `app/events/[id]/index.tsx` |
 | イベント作成 O-02(下タブ「イベント作成」から開く) | `app/(tabs)/create.tsx` + `src/components/EventForm.tsx` |
 | お知らせ・マイページ(デザイン案なし。「準備中」表示) | `app/(tabs)/announcements.tsx` `app/(tabs)/mypage.tsx` |
