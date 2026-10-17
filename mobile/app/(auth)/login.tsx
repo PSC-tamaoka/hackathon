@@ -1,8 +1,9 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { type Href, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,6 +17,7 @@ import { AppText } from "@/src/components/AppText";
 import { BottomSheet } from "@/src/components/BottomSheet";
 import { Icon, type IconName } from "@/src/components/Icon";
 import { images } from "@/src/constants/images";
+import { errorMessage, signIn, signUp } from "@/src/lib/api";
 import { colors, fonts, radius, space } from "@/src/constants/theme";
 
 type Mode = "register" | "login";
@@ -50,6 +52,8 @@ const residenceLabel = (value: string) =>
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  // redirect: 招待ページなどから来たとき、ログイン後に戻る先
+  const { redirect } = useLocalSearchParams<{ redirect?: string }>();
 
   const [mode, setMode] = useState<Mode>("register");
   const [name, setName] = useState("");
@@ -61,11 +65,15 @@ export default function LoginScreen() {
   const [memories, setMemories] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const isRegister = mode === "register";
-  const nameError = showErrors && !name.trim();
+  const nameError = showErrors && isRegister && !name.trim();
   const emailError = showErrors && !/^\S+@\S+\.\S+$/.test(email);
-  const termsError = showErrors && !agreed;
+  const passwordError = showErrors && password.length < 6;
+  const termsError = showErrors && isRegister && !agreed;
 
   // 認証は未接続。Googleボタンは入力を埋めるだけの仮動作
   const fillFromGoogle = () => {
@@ -74,10 +82,33 @@ export default function LoginScreen() {
     setGoogleSynced(true);
   };
 
-  const submit = () => {
+  // 新規登録：メール＋パスワードで作成し、表示名・年代・居住地・思い出メモを保存する
+  // ログイン：メール＋パスワードだけ
+  const submit = async () => {
     setShowErrors(true);
-    if (!name.trim() || !/^\S+@\S+\.\S+$/.test(email) || !agreed) return;
-    router.replace("/(tabs)");
+    setAuthError(null);
+    if (!/^\S+@\S+\.\S+$/.test(email) || password.length < 6) return;
+    if (isRegister && (!name.trim() || !agreed)) return;
+    setBusy(true);
+    try {
+      if (isRegister) {
+        await signUp({
+          email: email.trim(),
+          password,
+          name: name.trim(),
+          ageGroup: age,
+          residence,
+          memories: memories.trim(),
+        });
+      } else {
+        await signIn(email.trim(), password);
+      }
+      router.replace(redirect ? (redirect as Href) : "/(tabs)");
+    } catch (e) {
+      setAuthError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -141,15 +172,17 @@ export default function LoginScreen() {
             <View style={styles.dividerLine} />
           </View>
 
-          <Field icon="badge" label="表示名 / ニックネーム" required hint="海の学校クエストや想い出広場で公開されます" error={nameError ? "表示名を入力してください" : undefined}>
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder="例：渋川カモメ、玉野のユウキ"
-              placeholderTextColor={colors.outline}
-              style={styles.input}
-            />
-          </Field>
+          {isRegister && (
+            <Field icon="badge" label="表示名 / ニックネーム" required hint="海の学校クエストや想い出広場で公開されます" error={nameError ? "表示名を入力してください" : undefined}>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder="例：渋川カモメ、玉野のユウキ"
+                placeholderTextColor={colors.outline}
+                style={styles.input}
+              />
+            </Field>
+          )}
 
           <Field icon="mail" label="メールアドレス" required error={emailError ? "正しいメールアドレスを入力してください" : undefined}>
             <TextInput
@@ -175,80 +208,117 @@ export default function LoginScreen() {
             )}
           </Field>
 
-          <Field icon="history-edu" label="年代" required hint="同世代の卒業生・参加者とのマッチングに役立ちます">
-            <View style={styles.ageGrid}>
-              {AGE_GROUPS.map((a) => (
-                <Pressable
-                  key={a}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: age === a }}
-                  onPress={() => setAge(a)}
-                  style={[styles.ageBtn, age === a && styles.ageActive]}
-                >
-                  <AppText variant="labelMd" color={age === a ? colors.onPrimary : colors.onSurface}>
-                    {a}
-                  </AppText>
-                </Pressable>
-              ))}
-            </View>
-          </Field>
-
-          <Field icon="location-on" label="居住地" required>
-            <Pressable accessibilityRole="button" onPress={() => setResidenceOpen(true)} style={[styles.input, styles.select]}>
-              <AppText variant="bodyMd" color={residence ? colors.onSurface : colors.outline}>
-                {residenceLabel(residence) || "お住まいの地域を選択してください"}
-              </AppText>
-              <Icon name="expand-more" size={24} color={colors.onSurfaceVariant} />
-            </Pressable>
-          </Field>
-
           <Field
-            icon="sailing"
-            iconColor={colors.secondaryContainer}
-            label="海の学校・青年の家の思い出メモ"
-            optional
-            hint="参加年度、学校名、カッター漕艇訓練、キャンプファイヤーなど自由に記録できます。"
+            icon="lock"
+            label="パスワード"
+            required
+            hint={isRegister ? "6文字以上で設定してください" : undefined}
+            error={passwordError ? "パスワードは6文字以上で入力してください" : undefined}
           >
             <TextInput
-              value={memories}
-              onChangeText={setMemories}
-              multiline
-              numberOfLines={4}
-              placeholder="例：平成12年に中学校の海の学校でカッターを漕ぎました！"
+              value={password}
+              onChangeText={setPassword}
+              placeholder="6文字以上"
               placeholderTextColor={colors.outline}
-              style={[styles.input, { minHeight: 104, paddingTop: 12, textAlignVertical: "top" }]}
+              secureTextEntry
+              autoCapitalize="none"
+              autoComplete={isRegister ? "new-password" : "current-password"}
+              style={styles.input}
             />
           </Field>
 
-          <Pressable
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: agreed }}
-            onPress={() => setAgreed((v) => !v)}
-            style={styles.terms}
-          >
-            <View style={[styles.checkbox, agreed && { backgroundColor: colors.primary, borderColor: colors.primary }]}>
-              {agreed && <Icon name="check" size={16} color={colors.onPrimary} />}
-            </View>
-            <AppText variant="bodySm" style={{ flex: 1 }}>
-              <AppText variant="labelMd" color={colors.primary} style={{ textDecorationLine: "underline" }}>
-                利用規約
-              </AppText>
-              および
-              <AppText variant="labelMd" color={colors.primary} style={{ textDecorationLine: "underline" }}>
-                プライバシーポリシー
-              </AppText>
-              に同意して、渋川コミュニティに参加します。
-            </AppText>
-          </Pressable>
-          {termsError && (
-            <AppText variant="labelMd" color={colors.error}>
-              利用規約およびプライバシーポリシーへの同意をお願いします。
-            </AppText>
+          {isRegister && (
+            <>
+              <Field icon="history-edu" label="年代" required hint="同世代の卒業生・参加者とのマッチングに役立ちます">
+                <View style={styles.ageGrid}>
+                  {AGE_GROUPS.map((a) => (
+                    <Pressable
+                      key={a}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: age === a }}
+                      onPress={() => setAge(a)}
+                      style={[styles.ageBtn, age === a && styles.ageActive]}
+                    >
+                      <AppText variant="labelMd" color={age === a ? colors.onPrimary : colors.onSurface}>
+                        {a}
+                      </AppText>
+                    </Pressable>
+                  ))}
+                </View>
+              </Field>
+
+              <Field icon="location-on" label="居住地" required>
+                <Pressable accessibilityRole="button" onPress={() => setResidenceOpen(true)} style={[styles.input, styles.select]}>
+                  <AppText variant="bodyMd" color={residence ? colors.onSurface : colors.outline}>
+                    {residenceLabel(residence) || "お住まいの地域を選択してください"}
+                  </AppText>
+                  <Icon name="expand-more" size={24} color={colors.onSurfaceVariant} />
+                </Pressable>
+              </Field>
+
+              <Field
+                icon="sailing"
+                iconColor={colors.secondaryContainer}
+                label="海の学校・青年の家の思い出メモ"
+                optional
+                hint="参加年度、学校名、カッター漕艇訓練、キャンプファイヤーなど自由に記録できます。"
+              >
+                <TextInput
+                  value={memories}
+                  onChangeText={setMemories}
+                  multiline
+                  numberOfLines={4}
+                  placeholder="例：平成12年に中学校の海の学校でカッターを漕ぎました！"
+                  placeholderTextColor={colors.outline}
+                  style={[styles.input, { minHeight: 104, paddingTop: 12, textAlignVertical: "top" }]}
+                />
+              </Field>
+
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: agreed }}
+                onPress={() => setAgreed((v) => !v)}
+                style={styles.terms}
+              >
+                <View style={[styles.checkbox, agreed && { backgroundColor: colors.primary, borderColor: colors.primary }]}>
+                  {agreed && <Icon name="check" size={16} color={colors.onPrimary} />}
+                </View>
+                <AppText variant="bodySm" style={{ flex: 1 }}>
+                  <AppText variant="labelMd" color={colors.primary} style={{ textDecorationLine: "underline" }}>
+                    利用規約
+                  </AppText>
+                  および
+                  <AppText variant="labelMd" color={colors.primary} style={{ textDecorationLine: "underline" }}>
+                    プライバシーポリシー
+                  </AppText>
+                  に同意して、渋川コミュニティに参加します。
+                </AppText>
+              </Pressable>
+              {termsError && (
+                <AppText variant="labelMd" color={colors.error}>
+                  利用規約およびプライバシーポリシーへの同意をお願いします。
+                </AppText>
+              )}
+            </>
           )}
 
           <View style={{ gap: 8, paddingTop: 4 }}>
-            <Pressable accessibilityRole="button" onPress={submit} style={styles.submit}>
-              <Icon name="explore" size={22} color={colors.onPrimary} />
+            {authError && (
+              <AppText variant="labelMd" color={colors.error}>
+                {authError}
+              </AppText>
+            )}
+            <Pressable
+              accessibilityRole="button"
+              disabled={busy}
+              onPress={submit}
+              style={[styles.submit, busy && { opacity: 0.6 }]}
+            >
+              {busy ? (
+                <ActivityIndicator color={colors.onPrimary} />
+              ) : (
+                <Icon name="explore" size={22} color={colors.onPrimary} />
+              )}
               <AppText variant="headlineSm" color={colors.onPrimary}>
                 {isRegister ? "登録してはじめる" : "ログインして再開"}
               </AppText>

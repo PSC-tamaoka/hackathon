@@ -2,63 +2,129 @@ import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
-import { useLocalSearchParams } from "expo-router";
-import { useState } from "react";
-import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
+import QRCode from "react-native-qrcode-svg";
 import { AppText } from "@/src/components/AppText";
 import { BackHeader } from "@/src/components/AppHeader";
 import { BottomSheet } from "@/src/components/BottomSheet";
 import { Icon, type IconName } from "@/src/components/Icon";
 import { Toast, type ToastState } from "@/src/components/Toast";
-import { commonTodos, findEvent } from "@/src/constants/mockEvents";
+import { commonTodos } from "@/src/constants/mockEvents";
 import { images } from "@/src/constants/images";
 import { colors, radius, space } from "@/src/constants/theme";
+import { useEvent } from "@/src/hooks/useEvent";
+import { applyEvent, cancelRegistration, checkTodo, errorMessage, getInviteUrl } from "@/src/lib/api";
 import { formatJaDate, parseDateKey, weekdayLabel } from "@/src/lib/dates";
 
 export default function EventDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const event = findEvent(id);
+  const router = useRouter();
+  // invite: 招待リンクから来たときのトークン(招待制のイベントを見る・申し込むのに使う)
+  const { id, invite } = useLocalSearchParams<{ id: string; invite?: string }>();
+  const { event, loading, error, reload } = useEvent(id, invite);
 
-  const [done, setDone] = useState<Set<string>>(() => new Set(["t1", "t2"]));
+  const [done, setDone] = useState<Set<string>>(() => new Set());
   const [shareOpen, setShareOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const [rsvpOpen, setRsvpOpen] = useState(false);
-  const [registered, setRegistered] = useState(true);
+  const [registered, setRegistered] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
+  const hideToast = useCallback(() => setToast(null), []);
+
+  // 読み込んだ内容(自分の出欠・TODOのチェック)を画面に反映する
+  useEffect(() => {
+    if (!event) return;
+    setRegistered(event.isRegistered ?? false);
+    setDone(new Set(event.checkedTodoIds ?? []));
+  }, [event]);
 
   if (!event) {
     return (
       <View style={{ flex: 1 }}>
         <BackHeader title="Event Detail" />
         <View style={styles.notFound}>
-          <AppText variant="bodyLg" color={colors.onSurfaceVariant}>
-            イベントが見つかりません
-          </AppText>
+          {loading ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : (
+            <AppText variant="bodyLg" color={colors.onSurfaceVariant}>
+              {error ?? "イベントが見つかりません"}
+            </AppText>
+          )}
         </View>
       </View>
     );
   }
 
-  const shareUrl = Linking.createURL(`/events/${event.id}`);
+  const linkToShare = shareUrl ?? Linking.createURL(`/events/${event.id}`);
   const percent = Math.round((done.size / commonTodos.length) * 100);
   const d = parseDateKey(event.date);
   const dateLabel = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日(${weekdayLabel(d)})`;
 
-  const toggleTodo = (todoId: string) =>
-    setDone((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(todoId)) next.add(todoId);
-      return next;
-    });
+  const showError = (e: unknown) => setToast({ heading: "できませんでした", body: errorMessage(e), icon: "warning" });
+
+  // TODOのチェック(参加登録した人が、イベント当日だけ)。先に画面を変えて、失敗したら戻す
+  const toggleTodo = async (todoId: string) => {
+    if (!registered) {
+      setToast({ heading: "参加登録が必要です", body: "参加登録すると当日のTODOをチェックできます。", icon: "info" });
+      return;
+    }
+    const checked = !done.has(todoId);
+    const before = done;
+    const next = new Set(done);
+    if (checked) next.add(todoId);
+    else next.delete(todoId);
+    setDone(next);
+    try {
+      setDone(new Set(await checkTodo(event.id, todoId, checked)));
+    } catch (e) {
+      setDone(before);
+      showError(e);
+    }
+  };
+
+  // 共有シートを開くときに招待リンクを用意する(招待ページ /invite/<token> へのリンク)
+  const openShare = async () => {
+    setShareOpen(true);
+    if (shareUrl) return;
+    try {
+      setShareUrl(await getInviteUrl(event.id));
+    } catch {
+      // 招待リンクを作れないとき(招待制で権限がない等)はイベントのリンクで代用
+    }
+  };
+
+  const changeRsvp = async (join: boolean) => {
+    setRsvpOpen(false);
+    if (join === registered || busy) return;
+    setBusy(true);
+    try {
+      if (join) await applyEvent(event.id, invite);
+      else await cancelRegistration(event.id);
+      await reload();
+      setToast(
+        join
+          ? { heading: "参加登録しました", body: "当日お会いできるのを楽しみにしています。", icon: "celebration" }
+          : { heading: "参加をとりやめました", body: "またのご参加をお待ちしています。", icon: "event-busy" },
+      );
+    } catch (e) {
+      showError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const copyLink = async () => {
-    await Clipboard.setStringAsync(shareUrl);
+    await Clipboard.setStringAsync(linkToShare);
     setShareOpen(false);
     setToast({ heading: "コピーしました", body: "リンクをクリップボードにコピーしました。", icon: "content-copy" });
   };
   const shareVia = async () => {
     setShareOpen(false);
     try {
-      await Share.share({ message: `${event.title}\n${formatJaDate(event.date)}\n${shareUrl}` });
+      await Share.share({ message: `${event.title}\n${formatJaDate(event.date)}\n${linkToShare}` });
     } catch {
       setToast({ heading: "共有できません", body: "もう一度お試しください。", icon: "warning" });
     }
@@ -77,7 +143,7 @@ export default function EventDetailScreen() {
               </AppText>
             </View>
           </View>
-          <Pressable accessibilityRole="button" onPress={() => setShareOpen(true)} style={styles.shareBtn}>
+          <Pressable accessibilityRole="button" onPress={openShare} style={styles.shareBtn}>
             <Icon name="share" size={18} color={colors.primary} />
             <AppText variant="labelLg" color={colors.primary}>
               共有
@@ -234,13 +300,35 @@ export default function EventDetailScreen() {
               定員まであと{event.remaining}名
             </AppText>
           </View>
-          <Pressable accessibilityRole="button" onPress={() => setRsvpOpen(true)} style={styles.rsvpBtn}>
-            <Icon name="how-to-reg" size={20} color={colors.onPrimary} />
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy}
+            onPress={() => setRsvpOpen(true)}
+            style={[styles.rsvpBtn, busy && { opacity: 0.6 }]}
+          >
+            {busy ? (
+              <ActivityIndicator color={colors.onPrimary} />
+            ) : (
+              <Icon name="how-to-reg" size={20} color={colors.onPrimary} />
+            )}
             <AppText variant="headlineSm" color={colors.onPrimary}>
               出欠状況の確認・変更
             </AppText>
           </Pressable>
         </View>
+
+        {event.isOrganizer && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push({ pathname: "/organizer/[id]/invite", params: { id: event.id } })}
+            style={styles.organizerBtn}
+          >
+            <Icon name="forward-to-inbox" size={20} color={colors.primary} />
+            <AppText variant="labelLg" color={colors.primary}>
+              主催者メニュー：招待リンク・QRコード
+            </AppText>
+          </Pressable>
+        )}
       </ScrollView>
 
       <BottomSheet visible={shareOpen} onClose={() => setShareOpen(false)}>
@@ -262,7 +350,32 @@ export default function EventDetailScreen() {
           <ShareAction icon="chat" label="LINEで送る" bg={colors.tertiaryContainer} fg={colors.onTertiaryContainer} onPress={shareVia} />
           <ShareAction icon="tag" label="SNSポスト" bg={colors.inverseSurface} fg={colors.inverseOnSurface} onPress={shareVia} />
           <ShareAction icon="content-copy" label="URLコピー" bg={colors.primaryFixed} fg={colors.onPrimaryFixed} onPress={copyLink} />
+          <ShareAction
+            icon="qr-code-2"
+            label="QRコード"
+            bg={colors.secondaryFixed}
+            fg={colors.onSecondaryFixed}
+            onPress={() => {
+              setShareOpen(false);
+              setQrOpen(true);
+            }}
+          />
         </View>
+      </BottomSheet>
+
+      <BottomSheet visible={qrOpen} onClose={() => setQrOpen(false)}>
+        <View style={styles.sheetHead}>
+          <AppText variant="headlineSm">招待QRコード</AppText>
+          <Pressable accessibilityLabel="閉じる" onPress={() => setQrOpen(false)} style={styles.closeBtn}>
+            <Icon name="close" size={20} />
+          </Pressable>
+        </View>
+        <View style={styles.qrBox}>
+          <QRCode value={linkToShare} size={200} />
+        </View>
+        <AppText variant="bodySm" color={colors.onSurfaceVariant} style={{ textAlign: "center" }}>
+          スマホのカメラで読み取ると、このイベントの招待ページが開きます。
+        </AppText>
       </BottomSheet>
 
       <BottomSheet visible={rsvpOpen} onClose={() => setRsvpOpen(false)}>
@@ -270,10 +383,7 @@ export default function EventDetailScreen() {
         <View style={{ gap: 10 }}>
           <Pressable
             accessibilityRole="button"
-            onPress={() => {
-              setRegistered(true);
-              setRsvpOpen(false);
-            }}
+            onPress={() => changeRsvp(true)}
             style={[styles.choice, registered && styles.choiceActive]}
           >
             <Icon name="how-to-reg" size={20} color={colors.primary} />
@@ -281,10 +391,7 @@ export default function EventDetailScreen() {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            onPress={() => {
-              setRegistered(false);
-              setRsvpOpen(false);
-            }}
+            onPress={() => changeRsvp(false)}
             style={[styles.choice, !registered && styles.choiceActive]}
           >
             <Icon name="close" size={20} color={colors.error} />
@@ -293,7 +400,7 @@ export default function EventDetailScreen() {
         </View>
       </BottomSheet>
 
-      <Toast toast={toast} onHide={() => setToast(null)} bottom={24} />
+      <Toast toast={toast} onHide={hideToast} bottom={24} />
     </View>
   );
 }
@@ -490,4 +597,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceContainerLow,
   },
   choiceActive: { backgroundColor: colors.primaryFixed },
+  organizerBtn: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: radius.full,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+  },
+  qrBox: {
+    alignSelf: "center",
+    padding: 16,
+    borderRadius: radius.md,
+    backgroundColor: "#ffffff",
+  },
 });

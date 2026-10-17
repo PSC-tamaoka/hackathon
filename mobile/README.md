@@ -9,7 +9,8 @@ npx expo start      # Expo Go で確認(Android は a、Web は w)
 npm run typecheck
 ```
 
-現在は `work/画面.txt` のデザイン案4画面を仮データで表示するフロントエンドのみ(バックエンド未接続)。
+`work/画面.txt` のデザイン案の画面を実装し、Supabase に接続済み(`src/lib/api.ts`)。
+`mobile/.env` に接続先がなければ仮データ(`src/constants/mockEvents.ts`)で動く。接続の手順は `supabase/README.md`。
 
 ## ルート(`app/`)と画面ID
 
