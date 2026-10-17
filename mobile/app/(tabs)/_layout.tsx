@@ -4,9 +4,9 @@ import { AppHeader } from "@/src/components/AppHeader";
 import { Icon, type IconName } from "@/src/components/Icon";
 import { colors, fonts } from "@/src/constants/theme";
 
+// 下タブ: ホーム / お知らせ / マイページ(イベント作成は管理者限定のFABから)
 const TABS: { name: string; title: string; icon: IconName }[] = [
   { name: "index", title: "ホーム", icon: "calendar-month" },
-  { name: "create", title: "イベント作成", icon: "add-circle" },
   { name: "announcements", title: "お知らせ", icon: "campaign" },
   { name: "mypage", title: "マイページ", icon: "badge" },
 ];

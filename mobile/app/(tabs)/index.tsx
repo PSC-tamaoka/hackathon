@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/AppText";
+import { CreateEventFab } from "@/src/components/CreateEventFab";
 import { EventCalendar } from "@/src/components/EventCalendar";
 import { EventCard, MiniEventCard } from "@/src/components/EventCards";
 import { Icon } from "@/src/components/Icon";
@@ -35,7 +36,8 @@ export default function HomeScreen() {
   const openEvent = (id: string) => router.push({ pathname: "/events/[id]", params: { id } });
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <>
+      <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.toolbar}>
         <View style={styles.viewToggle}>
           <View style={[styles.toggleBtn, styles.toggleActive]}>
@@ -124,13 +126,15 @@ export default function HomeScreen() {
             </AppText>
           </View>
         </View>
-        <Pressable accessibilityRole="button" onPress={() => router.push("/(tabs)/create")} style={styles.bannerBtn}>
+        <Pressable accessibilityRole="button" onPress={() => router.push("/organizer/new")} style={styles.bannerBtn}>
           <AppText variant="labelMd" color={colors.primary}>
             新規作成
           </AppText>
         </Pressable>
       </View>
-    </ScrollView>
+      </ScrollView>
+      <CreateEventFab />
+    </>
   );
 }
 

@@ -1,6 +1,11 @@
 import { Redirect } from "expo-router";
+import { useSession } from "@/src/hooks/useSession";
 
-// 起動時はログイン画面へ(認証は未接続)
+// ログイン済みなら (tabs) へ、未ログインなら (auth)/login へ振り分ける
 export default function Index() {
-  return <Redirect href="/(auth)/login" />;
+  const { session, loading } = useSession();
+
+  if (loading) return null;
+
+  return <Redirect href={session ? "/(tabs)" : "/(auth)/login"} />;
 }
