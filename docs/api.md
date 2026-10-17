@@ -15,3 +15,4 @@
 | 名前 | 説明 | 優先度 |
 |---|---|---|
 | stamp_in | 押印(開催時間内・申込者本人・未押印を確認して stamps に追加) | Must |
+| is_admin | 管理者判定(users.is_admin。アプリの管理者チェックと、events などの RLS からも使う) | Must |

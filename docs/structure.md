@@ -13,7 +13,7 @@
 | ログイン・新規登録(P-01 と P-02 の入力を1画面にまとめたデザイン) | `app/(auth)/login.tsx` |
 | ホーム(カレンダー)P-03 | `app/(tabs)/index.tsx` |
 | イベント詳細 P-04(当日TODOリスト・共有つき) | `app/events/[id]/index.tsx` |
-| イベント作成 O-02(下タブ「イベント作成」から開く) | `app/(tabs)/create.tsx` + `src/components/EventForm.tsx` |
+| イベント作成 O-02(管理者のみ。ホーム右下のFABから開く) | `app/organizer/new.tsx` + `src/components/EventForm.tsx` |
 | お知らせ・マイページ(デザイン案なし。「準備中」表示) | `app/(tabs)/announcements.tsx` `app/(tabs)/mypage.tsx` |
 
 デザイン案が仕様書(スタンプラリー・招待制の運用など)と違う点は、デザイン案を優先して作った。仕様書側とのすり合わせは未了。
@@ -39,15 +39,16 @@
 | `app/(auth)/` | `_layout.tsx` ★ `login.tsx` ★ | P-01 ログイン・新規登録 |
 | `app/(onboarding)/` | `_layout.tsx` ★ `profile.tsx` ★ | P-02 初回プロフィール・渋川経験 |
 | `app/(onboarding)/` | `notification-permission.tsx` ★ | 通知許可の説明画面(P-02 の後) |
-| `app/(tabs)/` | `_layout.tsx` ★ | 下タブ(ホーム/マイページ) |
+| `app/(tabs)/` | `_layout.tsx` ★ | 下タブ(ホーム/お知らせ/マイページ) |
 | `app/(tabs)/` | `index.tsx` ★ | P-03 ホーム(月カレンダー) |
 | `app/(tabs)/` | `mypage.tsx` ★ | P-06 マイページ |
 | `app/events/[id]/` | `index.tsx` ★ | P-04 イベント詳細 |
 | `app/events/[id]/` | `apply.tsx` ★ | P-05 申込フォーム・完了 |
 | `app/events/[id]/` | `stamps.tsx` ★ | P-07 スタンプ台紙(P-08 押印の確認はここから開くモーダル部品) |
 | `app/events/[id]/` | `complete.tsx` ★ | P-09 コンプリート |
-| `app/organizer/` | `_layout.tsx` ★ `index.tsx` ★ | O-01 主催者ダッシュボード |
-| `app/organizer/` | `new.tsx` ★ | O-02 イベント作成 |
+| `app/organizer/` | `_layout.tsx` ★ | 管理者ゲート(非管理者は (tabs) へ戻す。organizer 配下は管理者のみ) |
+| `app/organizer/` | `index.tsx` ★ | O-01 ダッシュボード |
+| `app/organizer/` | `new.tsx` ★ | O-02 イベント作成(管理者のみ。FABから開く) |
 | `app/organizer/[id]/` | `edit.tsx` | O-02 イベント編集 |
 | `app/organizer/[id]/` | `invite.tsx` ★ | O-03 招待作成・送信 |
 | `app/organizer/[id]/` | `registrations.tsx` | O-04 申込者管理・当日受付 |
@@ -63,6 +64,7 @@
 |---|---|
 | `Button.tsx` ★ | 大きめの共通ボタン(画面下に置く主操作用) |
 | `TextField.tsx` ★ | 共通入力欄(本文16px以上) |
+| `CreateEventFab.tsx` ★ | 管理者(is_admin)のときだけ出るホーム右下の作成ボタン |
 | `EventCalendar.tsx` ★ | 月カレンダー+ドット(react-native-calendars) |
 | `EventPickerSheet.tsx` ★ | 同日に複数イベントがあるときの下から出るシート |
 | `EventCard.tsx` ★ | イベントの要約表示 |
@@ -126,6 +128,7 @@
 | 内容(ファイル名の目安) | 中身 |
 |---|---|
 | `create_tables` ★ | 9テーブル(users, shibukawa_experiences, events, plan_items, registrations, stamps, invitations, invitation_deliveries, push_tokens)と一意制約 |
+| `20261017212231_create_users` ★ | users・shibukawa_experiences・登録トリガー(handle_new_user)・RLS・is_admin()。SQL Editor で適用 |
 | `enable_rls` ★ | 全テーブルの RLS ポリシー(個人情報は本人・主催者に限定) |
 | `rpc_stamp_in` ★ | 押印用の PostgreSQL 関数(開催時間内・申込者本人・未押印を確認) |
 | `rpc_target_count` ★ | 対象条件に合う受信許可ユーザー数を返す関数(招待画面の「対象人数」用。匿名の人数のみ返す) |
