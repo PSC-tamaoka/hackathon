@@ -4,13 +4,27 @@
 画面ID(P-xx / O-xx / A-xx)・機能ID(F-xx)・テーブル名は [spec.md](spec.md) の定義。
 ★ = MVP(仕様書9章の1日版)で必要。無印は Should 以下なので後回し。
 
+## 0. 実装済み(フロントエンド・仮データ版)
+
+デザイン案4画面を `mobile/` に実装済み。データは `src/constants/mockEvents.ts` の仮データで、バックエンドには未接続。
+
+| 画面 | ファイル |
+|---|---|
+| ログイン・新規登録(P-01 と P-02 の入力を1画面にまとめたデザイン) | `app/(auth)/login.tsx` |
+| ホーム(カレンダー)P-03 | `app/(tabs)/index.tsx` |
+| イベント詳細 P-04(当日TODOリスト・共有つき) | `app/events/[id]/index.tsx` |
+| イベント作成 O-02(下タブ「イベント作成」から開く) | `app/(tabs)/create.tsx` + `src/components/EventForm.tsx` |
+| お知らせ・マイページ(デザイン案なし。「準備中」表示) | `app/(tabs)/announcements.tsx` `app/(tabs)/mypage.tsx` |
+
+デザイン案が仕様書(スタンプラリー・招待制の運用など)と違う点は、デザイン案を優先して作った。仕様書側とのすり合わせは未了。
+
 ## 1. `mobile/` 直下(ツールが生成するもの)
 
 自分で書かず、コマンドで生成する。
 
 | ファイル | 作り方 |
 |---|---|
-| `package.json` `app.json` `tsconfig.json` | `mobile/` 内で `npx create-expo-app@latest .`(既存の `app/` `src/` は残す) |
+| `package.json` `app.json` `tsconfig.json` | 作成済み(Expo SDK 58) |
 | `eas.json` | `eas build:configure`(開発ビルド用。Androidは FCM の設定も) |
 | `.env` | `.env.example` をコピー(コミットしない) |
 

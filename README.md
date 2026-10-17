@@ -20,6 +20,14 @@ work/      作業用の素材(git 追跡しない)
 
 TypeScript / React Native + Expo / Supabase(PostgreSQL・Auth・Edge Functions・Storage)/ Resend / Expo Push
 
+## 起動
+
+```powershell
+cd mobile
+npm install
+npx expo start
+```
+
 ## 環境変数
 
 `mobile/.env.example` と `supabase/.env.example` をコピーして `.env` を作る(コミットしない)。

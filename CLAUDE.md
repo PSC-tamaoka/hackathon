@@ -19,3 +19,5 @@
 - 過剰設計しない。テストは後回し、デモで見せる部分を優先
 - 秘密情報は `.env` に置き、コミットしない
 - 前提: Windows / PowerShell
+- 起動: `cd mobile && npx expo start`、型チェック: `npm run typecheck`
+- 現状はフロントエンドのみ。データは `mobile/src/constants/mockEvents.ts` の仮データ

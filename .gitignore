@@ -13,3 +13,4 @@ supabase/.branches/
 data/*
 !data/.gitkeep
 !data/README.md
+expo-env.d.ts

@@ -1,6 +1,15 @@
 # mobile/
 
-Expo (React Native + TypeScript + Expo Router) のアプリ本体。プロジェクト作成は `mobile/` 直下で行う。
+Expo (React Native + TypeScript + Expo Router) のアプリ本体。
+
+```powershell
+cd mobile
+npm install
+npx expo start      # Expo Go で確認(Android は a、Web は w)
+npm run typecheck
+```
+
+現在は `work/画面.txt` のデザイン案4画面を仮データで表示するフロントエンドのみ(バックエンド未接続)。
 
 ## ルート(`app/`)と画面ID
 
