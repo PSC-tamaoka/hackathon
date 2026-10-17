@@ -9,7 +9,11 @@ npx expo start      # Expo Go で確認(Android は a、Web は w)
 npm run typecheck
 ```
 
-現在は `work/画面.txt` のデザイン案4画面を仮データで表示するフロントエンドのみ(バックエンド未接続)。
+現在は `work/画面.txt` のデザイン案4画面を仮データで表示するフロントエンドに、認証(F-01)のみ Supabase Auth で接続した状態。
+メール+パスワードで登録・ログイン可(Googleボタンは見た目のみ)。プロフィール保存は `users` / `shibukawa_experiences` テーブル作成後に有効。
+
+`.env.example` をコピーした `.env` に `EXPO_PUBLIC_SUPABASE_URL` と `EXPO_PUBLIC_SUPABASE_ANON_KEY` を設定して使う。
+Supabase ダッシュボードの「メールアドレス確認」は OFF 推奨(登録→即ログインになる)。
 
 ## ルート(`app/`)と画面ID
 
