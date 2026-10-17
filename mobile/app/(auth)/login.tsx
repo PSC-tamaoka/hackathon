@@ -209,15 +209,17 @@ export default function LoginScreen() {
             <View style={styles.dividerLine} />
           </View>
 
-          <Field icon="badge" label="表示名 / ニックネーム" required hint="海の学校クエストや想い出広場で公開されます" error={nameError ? "表示名を入力してください" : undefined}>
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder="例：渋川カモメ、玉野のユウキ"
-              placeholderTextColor={colors.outline}
-              style={styles.input}
-            />
-          </Field>
+          {isRegister && (
+            <Field icon="badge" label="表示名 / ニックネーム" required hint="海の学校クエストや想い出広場で公開されます" error={nameError ? "表示名を入力してください" : undefined}>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder="例：渋川カモメ、玉野のユウキ"
+                placeholderTextColor={colors.outline}
+                style={styles.input}
+              />
+            </Field>
+          )}
 
           <Field icon="mail" label="メールアドレス" required error={emailError ? "正しいメールアドレスを入力してください" : undefined}>
             <TextInput
