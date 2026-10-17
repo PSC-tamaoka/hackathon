@@ -20,4 +20,4 @@
 - 秘密情報は `.env` に置き、コミットしない
 - 前提: Windows / PowerShell
 - 起動: `cd mobile && npx expo start`、型チェック: `npm run typecheck`
-- 現状はフロントエンドのみ。データは `mobile/src/constants/mockEvents.ts` の仮データ
+- アプリは `mobile/src/lib/api.ts` 経由で Supabase に接続済み。`mobile/.env` が空なら仮データ(`mockEvents.ts`)で動く。接続手順は `supabase/README.md`

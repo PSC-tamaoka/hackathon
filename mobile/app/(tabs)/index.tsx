@@ -1,7 +1,8 @@
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText } from "@/src/components/AppText";
+import { CreateEventFab } from "@/src/components/CreateEventFab";
 import { EventCalendar } from "@/src/components/EventCalendar";
 import { EventCard, MiniEventCard } from "@/src/components/EventCards";
 import { Icon } from "@/src/components/Icon";
@@ -11,14 +12,19 @@ import { toDateKey } from "@/src/lib/dates";
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { events, loading, error, reload } = useEvents();
   const today = new Date();
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() });
-  const [picked, setPicked] = useState<string | null>(null);
-  // 操作するまでは、今日以降で一番近いイベントの日を選んでおく。なければ今日
-  const selectedKey =
-    picked ?? events.map((e) => e.date).filter((d) => d >= toDateKey(today)).sort()[0] ?? toDateKey(today);
-  const setSelectedKey = setPicked;
+  const [selectedKey, setSelectedKey] = useState(() => toDateKey(today));
+  const { events, loading, error } = useEvents(cursor.year, cursor.month);
+
+  // 最初の読み込み後に、今日以降で一番近いイベントの日を選ぶ。なければ今日のまま
+  const autoSelected = useRef(false);
+  useEffect(() => {
+    if (autoSelected.current || loading) return;
+    autoSelected.current = true;
+    const upcoming = events.map((e) => e.date).filter((d) => d >= toDateKey(today)).sort();
+    if (upcoming[0]) setSelectedKey(upcoming[0]);
+  }, [events, loading]);
 
   const eventDates = useMemo(() => new Set(events.map((e) => e.date)), [events]);
   const selectedEvents = events.filter((e) => e.date === selectedKey);
@@ -36,7 +42,8 @@ export default function HomeScreen() {
   const openEvent = (id: string) => router.push({ pathname: "/events/[id]", params: { id } });
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <>
+      <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.toolbar}>
         <View style={styles.viewToggle}>
           <View style={[styles.toggleBtn, styles.toggleActive]}>
@@ -68,15 +75,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {loading && <ActivityIndicator color={colors.primary} />}
-      {error && (
-        <Pressable accessibilityRole="button" onPress={reload} style={styles.empty}>
-          <AppText variant="bodyMd" color={colors.onSurfaceVariant}>
-            {error}(タップで再読み込み)
-          </AppText>
-        </Pressable>
-      )}
-
       <EventCalendar
         year={cursor.year}
         month={cursor.month}
@@ -95,7 +93,17 @@ export default function HomeScreen() {
             {selectedEvents.length}件
           </AppText>
         </View>
-        {selectedEvents.length === 0 ? (
+        {error ? (
+          <View style={styles.empty}>
+            <AppText variant="bodyMd" color={colors.error}>
+              {error}
+            </AppText>
+          </View>
+        ) : loading && events.length === 0 ? (
+          <View style={styles.empty}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : selectedEvents.length === 0 ? (
           <View style={styles.empty}>
             <AppText variant="bodyMd" color={colors.onSurfaceVariant}>
               この日のイベントはありません
@@ -134,13 +142,15 @@ export default function HomeScreen() {
             </AppText>
           </View>
         </View>
-        <Pressable accessibilityRole="button" onPress={() => router.push("/(tabs)/create")} style={styles.bannerBtn}>
+        <Pressable accessibilityRole="button" onPress={() => router.push("/organizer/new")} style={styles.bannerBtn}>
           <AppText variant="labelMd" color={colors.primary}>
             新規作成
           </AppText>
         </Pressable>
       </View>
-    </ScrollView>
+      </ScrollView>
+      <CreateEventFab />
+    </>
   );
 }
 
