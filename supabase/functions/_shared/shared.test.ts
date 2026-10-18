@@ -5,9 +5,9 @@ import { createResendBatchSender } from "./resend.ts";
 import { buildUnsubscribeUrl, signUnsubscribe, verifyUnsubscribe } from "./unsubscribe.ts";
 
 const settings = {
-  from: "渋川つながり <invite@example.jp>",
+  from: "Re:海学 <invite@example.jp>",
   inviteBaseUrl: "https://shibukawa.example.com/",
-  senderInfo: "渋川つながり運営チーム",
+  senderInfo: "Re:海学運営チーム",
 };
 
 const event = {

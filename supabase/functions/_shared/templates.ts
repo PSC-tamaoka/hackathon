@@ -29,9 +29,9 @@ export type EmailMessage = {
 };
 
 export type EmailSettings = {
-  from: string; // 例: "渋川つながり <invite@example.com>"（Resend で認証済みのドメイン）
+  from: string; // 例: "Re:海学 <invite@example.com>"（Resend で認証済みのドメイン）
   inviteBaseUrl: string; // 例: "https://shibukawa.example.com" → /invite/<token>
-  senderInfo: string; // 例: "渋川つながり運営チーム（info@example.com）"
+  senderInfo: string; // 例: "Re:海学運営チーム（info@example.com）"
 };
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
@@ -86,7 +86,7 @@ export function buildInviteEmail(
   const text = [
     `${recipient.name} さん`,
     "",
-    "渋川つながりから、イベントのご案内です。",
+    "Re:海学から、イベントのご案内です。",
     "海の学校で過ごした渋川の海で、もう一度集まりませんか。",
     "",
     `■ ${event.title}`,
@@ -100,7 +100,7 @@ export function buildInviteEmail(
     url,
     "",
     "――――――――――",
-    "このメールは、渋川つながりで招待メールの受け取りを許可している方にお送りしています。",
+    "このメールは、Re:海学で招待メールの受け取りを許可している方にお送りしています。",
     `配信停止：${unsubscribeUrl}`,
     settings.senderInfo,
   ].join("\n");
@@ -111,7 +111,7 @@ export function buildInviteEmail(
 <body style="margin:0;padding:24px;background:#f4f7f9;font-family:'Hiragino Sans','Noto Sans JP',sans-serif;color:#1f2d3d;">
   <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:28px;">
     <p style="margin:0 0 16px;">${e(recipient.name)} さん</p>
-    <p style="margin:0 0 20px;line-height:1.7;">渋川つながりから、イベントのご案内です。<br>海の学校で過ごした渋川の海で、もう一度集まりませんか。</p>
+    <p style="margin:0 0 20px;line-height:1.7;">Re:海学から、イベントのご案内です。<br>海の学校で過ごした渋川の海で、もう一度集まりませんか。</p>
     <h1 style="font-size:20px;margin:0 0 12px;">${e(event.title)}</h1>
     <table style="border-collapse:collapse;margin:0 0 16px;font-size:15px;">
       <tr><td style="padding:4px 12px 4px 0;color:#5b6b7b;">日時</td><td style="padding:4px 0;">${e(date)}</td></tr>
@@ -124,7 +124,7 @@ export function buildInviteEmail(
     </p>
     <hr style="border:none;border-top:1px solid #e3e8ec;margin:0 0 16px;">
     <p style="margin:0;font-size:12px;line-height:1.7;color:#5b6b7b;">
-      このメールは、渋川つながりで招待メールの受け取りを許可している方にお送りしています。<br>
+      このメールは、Re:海学で招待メールの受け取りを許可している方にお送りしています。<br>
       今後の招待メールが不要な方は<a href="${e(unsubscribeUrl)}" style="color:#5b6b7b;">こちらから配信を停止</a>できます。<br>
       ${e(settings.senderInfo)}
     </p>

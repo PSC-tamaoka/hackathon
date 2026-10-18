@@ -338,7 +338,7 @@ export function EventForm() {
             badge="公開"
             badgeBg={colors.tertiaryFixed}
             badgeFg={colors.onTertiaryFixed}
-            text="渋川つながり登録者全員や一般向けに公開されます。全体のカレンダー・タイムラインに自動表示されます。"
+            text="Re:海学登録者全員や一般向けに公開されます。全体のカレンダー・タイムラインに自動表示されます。"
           />
           <ScopeOption
             active={scope === "closed"}
