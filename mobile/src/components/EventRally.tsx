@@ -1,6 +1,6 @@
 import { useAudioPlayer } from "expo-audio";
 import { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Animated, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText } from "./AppText";
 import { BottomSheet } from "./BottomSheet";
 import { Icon } from "./Icon";
@@ -9,18 +9,37 @@ import { rallySong } from "../constants/rallyMedia";
 import { colors, radius } from "../constants/theme";
 import { useRallyPeriod } from "../hooks/useRallyPeriod";
 import { rallyMissions, rallyPeriod, type RallyMission } from "../lib/eventRally";
-import type { Participation } from "../repositories/eventDetailRepository";
-import type { EventSummary } from "../types/event";
+import type { EventSummary, RallyParticipation } from "../types/event";
 
 type Props = {
   event: EventSummary;
-  participation: Participation;
+  participation: RallyParticipation;
   saving: boolean;
-  complete: (id: string) => Promise<Participation>;
+  loading: boolean;
+  loadError: string | null;
+  retry: () => void;
+  complete: (id: string) => Promise<string[]>;
 };
 
 export function EventRally(props: Props) {
   const period = useRallyPeriod(props.event);
+  if (props.event.status === "canceled") return (
+    <View style={styles.card}>
+      <AppText variant="headlineSm">TODO・スタンプラリー</AppText>
+      <AppText>中止になったイベントのミッションは利用できません。</AppText>
+    </View>
+  );
+  if (props.loading || props.loadError) return (
+    <View style={styles.card}>
+      <AppText variant="headlineSm">TODO・スタンプラリー</AppText>
+      {props.loading ? <ActivityIndicator color={colors.primary} /> : <>
+        <AppText accessibilityRole="alert">進捗を読み込めませんでした。通信環境を確認して再試行してください。</AppText>
+        <Pressable accessibilityRole="button" onPress={props.retry} style={styles.secondary}>
+          <AppText>再試行</AppText>
+        </Pressable>
+      </>}
+    </View>
+  );
   // この子をアンマウントして、期限到達時に確認・演出・動画もまとめて終了する。
   if (period === "active") return <ActiveRally {...props} />;
   return (
@@ -45,7 +64,7 @@ function ActiveRally({ event, participation, saving, complete }: Props) {
   const mounted = useRef(true);
   const successSound = useAudioPlayer(require("../../assets/audio/mission.wav"));
   const completeSound = useAudioPlayer(require("../../assets/audio/complete.wav"));
-  const done = new Set(participation.completed);
+  const done = new Set(participation.completed.filter((id) => rallyMissions.some((mission) => mission.id === id)));
   const allDone = rallyMissions.every((mission) => done.has(mission.id));
   const percent = Math.round((done.size / rallyMissions.length) * 100);
   const allowed = participation.registered && !saving;
@@ -79,7 +98,7 @@ function ActiveRally({ event, participation, saving, complete }: Props) {
       setAchievement(selected);
       // 保存は既に成功。効果音の不調を保存失敗として扱わない。
       if (!muted) {
-        const player = result.completed.length === rallyMissions.length ? completeSound : successSound;
+        const player = rallyMissions.every((mission) => result.includes(mission.id)) ? completeSound : successSound;
         try { await player.seekTo(0); if (mounted.current) player.play(); } catch { /* 消音環境でも達成は保持 */ }
       }
     } catch (cause) {

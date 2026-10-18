@@ -14,6 +14,7 @@ import type {
   RainPolicy,
 } from "@/src/types/event";
 import { isMock, supabase } from "./supabase";
+import { rallyMissions, rallyPeriod } from "./eventRally";
 
 export { isMock };
 
@@ -127,6 +128,7 @@ const mock = {
     status: "published",
   })),
   seq: 0,
+  rallyProgress: new Map<string, string[]>(),
 };
 
 function mockFind(id: string): EventSummary {
@@ -313,6 +315,31 @@ export async function checkTodo(id: string, todoId: string, checked: boolean): P
     return e.checkedTodoIds;
   }
   return rpc<string[]>("check_todo", { p_event_id: Number(id), p_todo_id: todoId, p_checked: checked });
+}
+
+/** 本人のラリー進捗。旧TODOのチェックとは別の記録を返す。 */
+export async function getRallyProgress(id: string): Promise<string[]> {
+  if (isMock) {
+    const event = mockFind(id);
+    return [...(mock.rallyProgress.get(`${event.id}:${event.date}`) ?? [])];
+  }
+  return rpc<string[]>("get_rally_progress", { p_event_id: Number(id) });
+}
+
+/** ミッション達成。本人の参加資格・期間をDBで確認し、保存済みのID一覧を返す。 */
+export async function completeRallyMission(id: string, missionId: string): Promise<string[]> {
+  if (!rallyMissions.some((mission) => mission.id === missionId)) throw new Error("ミッションが見つかりません");
+  if (isMock) {
+    const event = mockFind(id);
+    if (!event.isRegistered) throw new Error("参加登録が必要です");
+    if (event.status !== "published") throw new Error("このイベントではミッションを達成できません");
+    if (rallyPeriod(event) !== "active") throw new Error("ミッションの利用時間外です");
+    const key = `${event.id}:${event.date}`;
+    const completed = [...new Set([...(mock.rallyProgress.get(key) ?? []), missionId])].sort();
+    mock.rallyProgress.set(key, completed);
+    return [...completed];
+  }
+  return rpc<string[]>("complete_rally_mission", { p_event_id: Number(id), p_mission_id: missionId });
 }
 
 // ---------------------------------------------------------------------

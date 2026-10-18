@@ -3,7 +3,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import { AppText } from "@/src/components/AppText";
@@ -11,20 +11,29 @@ import { BackHeader } from "@/src/components/AppHeader";
 import { BottomSheet } from "@/src/components/BottomSheet";
 import { Icon, type IconName } from "@/src/components/Icon";
 import { Toast, type ToastState } from "@/src/components/Toast";
-import { commonTodos } from "@/src/constants/mockEvents";
+import { EventRally } from "@/src/components/EventRally";
 import { images } from "@/src/constants/images";
 import { colors, radius, space } from "@/src/constants/theme";
 import { useEvent } from "@/src/hooks/useEvent";
-import { applyEvent, cancelRegistration, checkTodo, errorMessage, getInviteUrl } from "@/src/lib/api";
+import { useRallyProgress } from "@/src/hooks/useRallyProgress";
+import { useSession } from "@/src/hooks/useSession";
+import { applyEvent, cancelRegistration, errorMessage, getInviteUrl } from "@/src/lib/api";
 import { formatJaDate, parseDateKey, weekdayLabel } from "@/src/lib/dates";
 
 export default function EventDetailScreen() {
-  const router = useRouter();
   // invite: 招待リンクから来たときのトークン(招待制のイベントを見る・申し込むのに使う)
   const { id, invite } = useLocalSearchParams<{ id: string; invite?: string }>();
-  const { event, loading, error, reload } = useEvent(id, invite);
+  const { ready, session } = useSession();
+  if (!ready) return <View style={styles.notFound}><ActivityIndicator color={colors.primary} /></View>;
+  // 同じ画面でIDやアカウントが変わっても、前のイベントの進捗・共有URLを引き継がない。
+  return <EventDetail key={`${session?.user.id ?? "guest"}:${id}:${invite ?? ""}`} id={id} invite={invite} />;
+}
 
-  const [done, setDone] = useState<Set<string>>(() => new Set());
+function EventDetail({ id, invite }: { id: string; invite?: string }) {
+  const router = useRouter();
+  const { event, loading, error, reload } = useEvent(id, invite);
+  const rally = useRallyProgress(id);
+
   const [shareOpen, setShareOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [rsvpOpen, setRsvpOpen] = useState(false);
@@ -33,12 +42,12 @@ export default function EventDetailScreen() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
   const hideToast = useCallback(() => setToast(null), []);
+  const mutating = useRef(false);
 
   // 読み込んだ内容(自分の出欠・TODOのチェック)を画面に反映する
   useEffect(() => {
     if (!event) return;
     setRegistered(event.isRegistered ?? false);
-    setDone(new Set(event.checkedTodoIds ?? []));
   }, [event]);
 
   if (!event) {
@@ -59,29 +68,19 @@ export default function EventDetailScreen() {
   }
 
   const linkToShare = shareUrl ?? Linking.createURL(`/events/${event.id}`);
-  const percent = Math.round((done.size / commonTodos.length) * 100);
   const d = parseDateKey(event.date);
   const dateLabel = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日(${weekdayLabel(d)})`;
 
   const showError = (e: unknown) => setToast({ heading: "できませんでした", body: errorMessage(e), icon: "warning" });
 
-  // TODOのチェック(参加登録した人が、イベント当日だけ)。先に画面を変えて、失敗したら戻す
-  const toggleTodo = async (todoId: string) => {
-    if (!registered) {
-      setToast({ heading: "参加登録が必要です", body: "参加登録すると当日のTODOをチェックできます。", icon: "info" });
-      return;
-    }
-    const checked = !done.has(todoId);
-    const before = done;
-    const next = new Set(done);
-    if (checked) next.add(todoId);
-    else next.delete(todoId);
-    setDone(next);
+  // DB保存が成功した後にだけキーワード・演出・歌を解放する。
+  const completeMission = async (missionId: string) => {
+    if (mutating.current || loading || error || !registered) throw new Error("参加登録が必要です。出欠状況を確認してください。");
+    mutating.current = true;
     try {
-      setDone(new Set(await checkTodo(event.id, todoId, checked)));
-    } catch (e) {
-      setDone(before);
-      showError(e);
+      return await rally.complete(missionId);
+    } finally {
+      mutating.current = false;
     }
   };
 
@@ -98,11 +97,13 @@ export default function EventDetailScreen() {
 
   const changeRsvp = async (join: boolean) => {
     setRsvpOpen(false);
-    if (join === registered || busy) return;
+    if (join === registered || mutating.current) return;
+    mutating.current = true;
     setBusy(true);
     try {
       if (join) await applyEvent(event.id, invite);
       else await cancelRegistration(event.id);
+      setRegistered(join);
       await reload();
       setToast(
         join
@@ -112,6 +113,7 @@ export default function EventDetailScreen() {
     } catch (e) {
       showError(e);
     } finally {
+      mutating.current = false;
       setBusy(false);
     }
   };
@@ -213,67 +215,16 @@ export default function EventDetailScreen() {
           </View>
         </View>
 
-        <View style={[styles.card, { backgroundColor: colors.surfaceContainerLow, gap: 16 }]}>
-          <View style={{ gap: 4 }}>
-            <View style={styles.todoHead}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Icon name="task-alt" size={24} color={colors.primary} />
-                <AppText variant="headlineSm">当日のTODOリスト</AppText>
-              </View>
-              <View style={styles.count}>
-                <AppText variant="labelLg" color={colors.onPrimaryFixed}>
-                  {done.size}/{commonTodos.length} 完了
-                </AppText>
-              </View>
-            </View>
-            <View style={styles.note}>
-              <Icon name="info" size={18} color={colors.primary} />
-              <AppText variant="bodySm" color={colors.onSurfaceVariant} style={{ flex: 1 }}>
-                ※全イベント参加者共通のやることリストです（登録・追加は不要）
-              </AppText>
-            </View>
-          </View>
-
-          <View style={{ gap: 6 }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              <AppText variant="labelSm" color={colors.onSurfaceVariant}>
-                達成度
-              </AppText>
-              <AppText variant="labelSm" color={colors.onSurfaceVariant}>
-                {percent}%
-              </AppText>
-            </View>
-            <View style={styles.track}>
-              <View style={[styles.fill, { width: `${percent}%` }]} />
-            </View>
-          </View>
-
-          <View style={{ gap: 8 }}>
-            {commonTodos.map((todo) => {
-              const checked = done.has(todo.id);
-              return (
-                <Pressable
-                  key={todo.id}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked }}
-                  onPress={() => toggleTodo(todo.id)}
-                  style={styles.todo}
-                >
-                  <View style={[styles.box, checked && styles.boxChecked]}>
-                    {checked && <Icon name="check" size={18} color={colors.onPrimary} />}
-                  </View>
-                  <AppText
-                    variant="bodyMd"
-                    color={checked ? colors.onSurfaceVariant : colors.onSurface}
-                    style={[{ flex: 1 }, checked && { textDecorationLine: "line-through" }]}
-                  >
-                    {todo.text}
-                  </AppText>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
+        <EventRally
+          key={`${event.id}:${event.date}:${event.startTime}:${registered}`}
+          event={event}
+          participation={{ registered, completed: rally.completed }}
+          saving={busy || rally.saving || loading || !!error}
+          loading={rally.loading}
+          loadError={rally.error}
+          retry={() => { void rally.reload(); }}
+          complete={completeMission}
+        />
 
         <View style={[styles.card, { gap: 12 }]}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -302,9 +253,9 @@ export default function EventDetailScreen() {
           </View>
           <Pressable
             accessibilityRole="button"
-            disabled={busy}
+            disabled={busy || rally.saving}
             onPress={() => setRsvpOpen(true)}
-            style={[styles.rsvpBtn, busy && { opacity: 0.6 }]}
+            style={[styles.rsvpBtn, (busy || rally.saving) && { opacity: 0.6 }]}
           >
             {busy ? (
               <ActivityIndicator color={colors.onPrimary} />
@@ -514,36 +465,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     backgroundColor: "rgba(250,248,255,0.9)",
   },
-  todoHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  count: { paddingHorizontal: 10, paddingVertical: 2, borderRadius: radius.full, backgroundColor: colors.primaryFixed },
-  note: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    padding: 10,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceContainerHigh,
-  },
-  track: { height: 8, borderRadius: 4, backgroundColor: colors.surfaceContainer, overflow: "hidden" },
-  fill: { height: "100%", backgroundColor: colors.primary, borderRadius: 4 },
-  todo: {
-    minHeight: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 14,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceContainerLowest,
-  },
-  box: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    backgroundColor: colors.surfaceContainerHighest,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  boxChecked: { backgroundColor: colors.primary },
   rsvp: {
     padding: 16,
     borderRadius: radius.card,

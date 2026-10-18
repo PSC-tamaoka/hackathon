@@ -71,3 +71,6 @@ export type TodoItem = {
   id: string;
   text: string;
 };
+
+/** ミッションの内容はアプリ内固定。参加資格と達成状況はログインユーザーのDB記録。 */
+export type RallyParticipation = { registered: boolean; completed: string[] };

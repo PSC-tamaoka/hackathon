@@ -18,6 +18,16 @@ RPC のエラーは日本語の文言で返るので、`error.message` をその
 | cancel_registration | p_event_id | 参加をとりやめる | ログイン済み |
 | check_todo | p_event_id, p_todo_id, p_checked | 当日のTODOをチェック・解除。参加登録した本人が、イベント当日(日本時間)だけ | ログイン済み |
 
+### 固定ミッションのラリー(`20261018090000_event_rally.sql`)
+
+| 名前 | 引数 | 説明 | 呼べる人 |
+|---|---|---|---|
+| get_rally_progress | p_event_id | 本人の達成済みミッションIDの配列。キャンセル後も履歴を保持 | ログイン済み |
+| complete_rally_mission | p_event_id, p_mission_id | 公開中・非表示でないイベントの参加者本人が、開始時刻〜翌々日0時(日本時間)に達成を保存。二重送信は1件にまとめ、保存済みID一覧を返す | ログイン済み |
+
+ミッションIDは `cutter / net / song / photo / memories` の5つ。項目・キーワードは `mobile/src/lib/eventRally.ts`、曲は `mobile/src/constants/rallyMedia.ts` に固定する。DBにはユーザーごとの達成記録(`rally_checks`)だけを保存する。達成取消APIは設けない。
+旧TODO(`todo_items` / `todo_checks`、ID `t1..t5`)は内容が違うため流用しない。既存の出欠・招待RPCと返却形式は維持する。
+
 ### 招待(`..._rpc_invitations.sql`)
 
 | 名前 | 引数 | 説明 | 呼べる人 |
@@ -33,7 +43,7 @@ RPC のエラーは日本語の文言で返るので、`error.message` をその
 |---|---|---|---|
 | is_admin | — | 管理者判定(users.is_admin。アプリの管理者チェックと、users などの RLS からも使う) | ログイン済み |
 
-イベントの作成・更新は RPC を使わず、アプリから `events` テーブルへ直接書く(RLS で主催者に限定)。
+イベントの作成・更新は RPC を使わず、アプリから `events` テーブルへ直接書く。作成はRLSでも管理者限定(`20261018090100_restrict_event_creation.sql`)、更新は主催者限定。
 
 ## Edge Functions(`supabase/functions/`)
 
@@ -43,8 +53,4 @@ RPC のエラーは日本語の文言で返るので、`error.message` をその
 | unsubscribe | 招待メールの配信停止リンクの受け口(署名付き) | メール本文のリンク |
 | send-notification | 申込完了メールなど(未着手) | — |
 
-### 未着手のRPC
-
-| 名前 | 説明 | 優先度 |
-|---|---|---|
-| stamp_in | 押印(開催時間内・申込者本人・未押印を確認して stamps に追加) | Must |
+スタンプ相当の達成処理は `complete_rally_mission` に統一する。

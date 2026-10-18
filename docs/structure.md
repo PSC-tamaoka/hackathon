@@ -7,13 +7,13 @@
 ## 0. 実装済み(フロントエンド・仮データ版)
 
 デザイン案の画面を `mobile/` に実装し、Supabase に接続済み。
-`mobile/.env` に Supabase の接続先がないときは、`src/constants/mockEvents.ts` の仮データでそのまま動く。
+イベントAPIは、`mobile/.env` に接続先がないときに `src/constants/mockEvents.ts` の仮データを返す。通常のログイン・登録にはSupabaseの設定が必要。
 
 | 画面 | ファイル | バックエンド |
 |---|---|---|
 | ログイン・新規登録(P-01 と P-02 の入力を1画面にまとめたデザイン) | `app/(auth)/login.tsx` | メール＋パスワード(Supabase Auth) |
 | ホーム(カレンダー)P-03 | `app/(tabs)/index.tsx` | `list_events` |
-| イベント詳細 P-04(当日TODOリスト・出欠・共有/QRつき) | `app/events/[id]/index.tsx` | `get_event` `apply_event` `cancel_registration` `check_todo` `create_invite_link` |
+| イベント詳細 P-04(固定ミッション・キーワード・歌解放・出欠・共有/QRつき) | `app/events/[id]/index.tsx` | `get_event` `apply_event` `cancel_registration` `get_rally_progress` `complete_rally_mission` `create_invite_link` |
 | イベント作成 O-02(管理者のみ。ホーム右下のFABから開く) | `app/organizer/new.tsx` + `src/components/EventForm.tsx` | `events` へ直接 insert |
 | 招待の設定 O-03(招待リンク・QR・全体招待メールの状況) | `app/organizer/[id]/invite.tsx` | `create_invite_link` `get_invite_status` |
 | 招待ページ(招待リンク・QRを開いたとき。ログイン前でも見られる) | `app/invite/[token].tsx` | `get_invite` `apply_event` |
@@ -24,9 +24,9 @@
 
 | 項目 | 仕様書 | 実装(デザイン案) |
 |---|---|---|
-| 当日の体験 | 固定プラン＋スタンプラリー | 全イベント共通の「当日のTODOリスト」(5項目。`todo_items`) |
+| 当日の体験 | 固定プラン＋スタンプラリー | 全イベント共通の固定ミッション5項目・キーワード・歌解放。内容はアプリ内固定、達成記録は `rally_checks` |
 | 招待 | 対象条件で抽出して送信(3回まで) | 公開形式で決まる。**招待制**＝招待リンク・QR、**オープン**＝開催14日前に会員全員へ自動メール |
-| 渋川経験 | 参加年度・学校名 | 自由記述の「思い出メモ」(`users.memories`) |
+| 渋川経験 | 参加年度・学校名 | 同じ。`shibukawa_experiences` に保存 |
 | ログイン | メール＋パスワード | 同じ(デザイン案にパスワード欄を追加。Google連携の見た目は残している) |
 
 ## 1. `mobile/` 直下(ツールが生成するもの)
@@ -81,6 +81,8 @@
 | `EventPickerSheet.tsx` ★ | 同日に複数イベントがあるときの下から出るシート |
 | `EventCard.tsx` ★ | イベントの要約表示 |
 | `EventForm.tsx` ★ | イベント作成・編集の入力項目(F-03) |
+| `EventRally.tsx` ★ | 固定ミッション・達成演出・キーワード収集・全達成時の歌解放 |
+| `RallySongPlayer.tsx` `RallySongPlayer.web.tsx` ★ | 固定YouTube動画の再生 |
 | `ExperienceForm.tsx` ★ | 渋川経験の入力(参加年度・学校名) |
 | ~~`PlanTimeline.tsx` `StampCard.tsx` `StampCell.tsx` `StampConfirmModal.tsx`~~ | スタンプラリー用(当日のTODOリストに置き換えたため作らない) |
 | `CompleteView.tsx` | コンプリート表示(Should) |
@@ -93,10 +95,12 @@
 | `useSession.ts` ★ | ログイン状態(作成済み) |
 | `useEvents.ts` ★ | 月ごとのイベント一覧(カレンダー用。作成済み) |
 | `useEvent.ts` ★ | イベント1件(残席・自分の出欠・TODOのチェックを含む。作成済み) |
+| `useRallyProgress.ts` ★ | ログインユーザー・イベントごとのラリー進捗の取得と達成保存 |
+| `useRallyPeriod.ts` ★ | 日本時間の開始時刻・翌々日0時で表示を切り替える |
 | `useProfile.ts` | 自分のプロフィール(マイページ用) |
 | `useOrganizerEvents.ts` | 自分が作ったイベント(主催者ダッシュボード用) |
 
-申込・TODOのチェック・招待リンクの取得は、フックにせず `lib/api.ts` の関数を画面から直接呼ぶ。
+申込・招待リンクの取得は `lib/api.ts` の関数を画面から直接呼ぶ。ラリー進捗の読み直し・達成保存・二重操作の制御は `useRallyProgress` にまとめる。
 
 ### `lib/`(外部サービスとの接続)
 
@@ -106,6 +110,7 @@
 | `api.ts` ★ | バックエンドとの通信をまとめたもの(RPC・ログイン・仮データ)。画面はこれだけを呼ぶ |
 | `notifications.ts` ★ | expo-notifications の許可・トークン取得・`push_tokens` 保存・タップ時の遷移 |
 | `dates.ts` | 日付の整形 |
+| `eventRally.ts` ★ | 全イベント共通の固定ミッション・キーワード・公開期間 |
 
 ### `constants/`
 
@@ -113,6 +118,7 @@
 |---|---|
 | `mockEvents.ts` ★ | 仮データと、当日のTODOリスト `commonTodos`(アプリ同梱。内容とIDは `todo_items` と同じにする) |
 | `theme.ts` ★ | 配色・文字サイズ・余白(高コントラスト、16px以上) |
+| `rallyMedia.ts` ★ | 全達成時に解放する固定動画・クレジット |
 
 ### `types/`
 
@@ -130,17 +136,23 @@
 
 ## 5. `supabase/`
 
+| ファイル | 用途 |
+|---|---|
+| `setup_from_users.sql` | `users` だけがあるDB向けの一括セットアップ。既存ユーザーを保持し、テーブル・RLS・認証トリガー・全RPC・ラリーを作成。SQL Editorで全体を1回実行 |
+
 ### `migrations/`(番号順に1テーマ1ファイル)
 
 ファイル名は `YYYYMMDDHHMMSS_内容.sql`。`supabase migration new 内容` で作る。
 
 | ファイル | 中身 |
 |---|---|
-| `20261017200000_create_tables.sql` ★ | 8テーブル(users, events, todo_items, registrations, todo_checks, invite_links, invitation_deliveries, push_tokens)、当日のTODO 5項目、会員登録時に users を作るトリガー |
+| `20261017190000_create_users.sql` ★ | users・shibukawa_experiences・登録トリガー・RLS・is_admin() |
+| `20261017200000_create_tables.sql` ★ | events, todo_items, registrations, todo_checks, invite_links, invitation_deliveries, push_tokens と旧TODOの固定データ |
 | `20261017200100_enable_rls.sql` ★ | 全テーブルの RLS と列の権限(個人情報は本人・主催者に限定。申込・TODO・招待は RPC 経由だけ) |
 | `20261017200200_rpc_events.sql` ★ | イベント一覧・詳細・参加・とりやめ・TODOチェックの RPC |
 | `20261017200300_rpc_invitations.sql` ★ | 招待リンク・招待ページ・招待状況・全体招待メール送信用の RPC |
-| `20261017212231_create_users.sql` ★ | users・shibukawa_experiences・登録トリガー(handle_new_user)・RLS・is_admin()。SQL Editor で適用 |
+| `20261018090000_event_rally.sql` ★ | ラリー達成記録・RLS・取得/達成RPC。項目の内容はDB管理しない |
+| `20261018090100_restrict_event_creation.sql` ★ | イベント作成をDBでも管理者限定にする |
 | `storage_buckets` | カバー画像のバケット(使う場合) |
 
 ### `seed.sql`(デモ用データ)
@@ -169,6 +181,14 @@
 | `functions/_shared/` | `expo-push.ts` | Expo Push 送信(未着手) |
 
 `supabase/config.toml` は `supabase init` で生成される。
+
+### テスト
+
+| ファイル | 内容 |
+|---|---|
+| `mobile/tests/rallyApi.test.cjs` | DB接続時のRPC呼び出し・保存失敗・モック時の参加資格と期間 |
+| `mobile/tests/rallyPeriod.test.cjs` | 日本時間の公開期間・開始/終了境界・年末越え |
+| `supabase/tests/event_rally.sql` | 使い捨てPostgreSQLで、本人の進捗・期間・二重達成・管理者制限を検証(最後にロールバック) |
 
 ## 6. `docs/`
 

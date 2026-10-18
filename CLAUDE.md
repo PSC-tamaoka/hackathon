@@ -20,4 +20,4 @@
 - 秘密情報は `.env` に置き、コミットしない
 - 前提: Windows / PowerShell
 - 起動: `cd mobile && npx expo start`、型チェック: `npm run typecheck`
-- アプリは `mobile/src/lib/api.ts` 経由で Supabase に接続済み。`mobile/.env` が空なら仮データ(`mockEvents.ts`)で動く。接続手順は `supabase/README.md`
+- イベント取得・出欠・ラリー達成は `mobile/src/lib/api.ts` 経由で Supabase に接続。ミッション・キーワード・曲はアプリ内固定、達成記録だけDB保存。イベントAPIは接続先未設定時に仮データを返すが、通常のログイン・登録には `.env` のSupabase設定が必要。接続手順は `supabase/README.md`
