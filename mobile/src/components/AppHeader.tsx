@@ -4,16 +4,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, space } from "@/src/constants/theme";
 import { AppText } from "./AppText";
 import { Icon } from "./Icon";
+import { ProfileMenu } from "./ProfileMenu";
 
-function ProfileBadge() {
-  return (
-    <View style={styles.avatar}>
-      <Icon name="person" size={18} color={colors.onPrimary} />
-    </View>
-  );
-}
-
-/** タブ画面共通のヘッダー(ロゴ・通知・プロフィール) */
+/** ホームのヘッダー(ロゴ・ユーザー情報) */
 export function AppHeader() {
   const insets = useSafeAreaInsets();
   return (
@@ -31,12 +24,7 @@ export function AppHeader() {
           </AppText>
         </View>
       </View>
-      <View style={styles.right}>
-        <Pressable accessibilityLabel="通知" style={styles.iconBtn}>
-          <Icon name="notifications" size={22} color={colors.onSurfaceVariant} />
-        </Pressable>
-        <ProfileBadge />
-      </View>
+      <ProfileMenu />
     </View>
   );
 }
@@ -60,7 +48,7 @@ export function BackHeader({ title }: { title: string }) {
         </AppText>
       </View>
       <View style={{ paddingRight: space.sm }}>
-        <ProfileBadge />
+        <ProfileMenu />
       </View>
     </View>
   );
@@ -86,14 +74,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   sub: { letterSpacing: 1, marginTop: 4 },
-  right: { flexDirection: "row", alignItems: "center", gap: space.xs },
   iconBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 });

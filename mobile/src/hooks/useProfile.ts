@@ -52,5 +52,5 @@ export function useProfile() {
     };
   }, [userId, sessionLoading]);
 
-  return { profile, loading, isAdmin: profile?.is_admin ?? false };
+  return { profile, user: session?.user ?? null, loading, isAdmin: profile?.is_admin ?? false };
 }
