@@ -9,7 +9,18 @@
     "userInterfaceStyle": "light",
     "plugins": [
       "expo-router",
-      ["expo-audio", { "microphonePermission": false, "recordAudioAndroid": false, "enableBackgroundPlayback": false }]
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      "expo-font",
+      "expo-image",
+      "expo-status-bar",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true

@@ -9,6 +9,23 @@ npx expo start      # Expo Go で確認(Android は a、Web は w)
 npm run typecheck
 ```
 
+## iPhone の Expo Go で確認する
+
+このプロジェクトは Expo SDK 57 を使う。iPhone には SDK 57 対応の Expo Go を入れ、CLI と Expo Go の両方で同じ Expo アカウントにログインする。
+SDK 58 への移行期間中は、ストア版 Expo Go が SDK 58 に未対応のため SDK 57 に揃えている([Expo 公式案内](https://docs.expo.dev/get-started/create-a-project/))。
+
+依存関係を更新した後は、起動中の Expo を `Ctrl+C` で止め、キャッシュを消して起動し直す。Wi-Fi 経由で接続できない場合はトンネルを使う。
+
+```sh
+npx expo start --go --tunnel --clear
+```
+
+SDK 57 のトンネル接続は Expo CLI が ngrok を起動する。必要な `@expo/ngrok` は開発依存に含めているため、別途 ngrok を手動起動する必要はない。
+
+WSL で `spawn firefox ENOENT` が出る場合は `BROWSER=none npx expo login --browser` を使い、表示された認証リンクを Windows のブラウザで開く。
+
+## 実装について
+
 `work/画面.txt` のデザイン案の画面を実装し、Supabase に接続済み(`src/lib/api.ts`)。
 認証はメール+パスワードで登録・ログイン可(Googleボタンは見た目のみ)。
 イベントAPIは接続先未設定時に仮データ(`src/constants/mockEvents.ts`)を返すが、通常のログイン・登録には `mobile/.env` のSupabase設定が必要。接続の手順は `supabase/README.md`。
