@@ -18,7 +18,9 @@ work/      作業用の素材(git 追跡しない)
 
 ## 技術
 
-TypeScript / React Native + Expo / Supabase(PostgreSQL・Auth・Edge Functions・Storage)/ Resend / Expo Push
+TypeScript / React Native + Expo SDK 57 / Supabase(PostgreSQL・Auth・Edge Functions) / Resend
+
+現在の実装のつながりは [技術構成図](docs/architecture.md) を参照。Mermaid ソースと SVG・PNG 画像を用意している。
 
 ## 起動
 
