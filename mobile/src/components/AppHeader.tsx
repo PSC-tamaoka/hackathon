@@ -24,7 +24,7 @@ export function AppHeader() {
         </View>
         <View>
           <AppText variant="headlineSm" color={colors.primary} style={{ lineHeight: 20 }}>
-            渋川つながり
+            Re:海学
           </AppText>
           <AppText variant="labelSm" color={colors.outline} style={styles.sub}>
             SHIBUKAWA ALUMNI

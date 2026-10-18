@@ -97,7 +97,7 @@ export default function InviteScreen() {
         <View style={styles.invitePill}>
           <Icon name="mail" size={16} color={colors.onSecondaryFixed} />
           <AppText variant="labelMd" color={colors.onSecondaryFixed}>
-            渋川つながりから招待が届いています
+            Re:海学から招待が届いています
           </AppText>
         </View>
 

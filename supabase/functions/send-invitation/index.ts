@@ -4,7 +4,7 @@
 // 必要なシークレット（supabase secrets set で登録）
 //   CRON_SECRET          pg_cron から呼ばれたことの確認用（Vault の cron_secret と同じ値）
 //   RESEND_API_KEY       Resend の API キー
-//   MAIL_FROM            送信元。例: 渋川つながり <invite@your-domain.jp>（Resend で認証済みのドメイン）
+//   MAIL_FROM            送信元。例: Re:海学 <invite@your-domain.jp>（Resend で認証済みのドメイン）
 //   INVITE_BASE_URL      招待ページの URL の頭。例: https://shibukawa.example.com
 //   UNSUBSCRIBE_SECRET   配信停止リンクの署名用（長いランダム文字列）
 //   MAIL_SENDER_INFO     メール末尾の運営者表記（任意）
@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
     const settings = {
       from: requireEnv("MAIL_FROM"),
       inviteBaseUrl: requireEnv("INVITE_BASE_URL"),
-      senderInfo: Deno.env.get("MAIL_SENDER_INFO") ?? "渋川つながり運営チーム",
+      senderInfo: Deno.env.get("MAIL_SENDER_INFO") ?? "Re:海学運営チーム",
     };
 
     const result = await runAllInvites(db, createResendBatchSender(requireEnv("RESEND_API_KEY")), {
