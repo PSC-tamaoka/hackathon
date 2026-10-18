@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/src/components/AppText";
 import { CreateEventFab } from "@/src/components/CreateEventFab";
 import { EventCalendar } from "@/src/components/EventCalendar";
@@ -12,6 +13,7 @@ import { toDateKey } from "@/src/lib/dates";
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const today = new Date();
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const [selectedKey, setSelectedKey] = useState(() => toDateKey(today));
@@ -43,7 +45,7 @@ export default function HomeScreen() {
 
   return (
     <>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 80 + insets.bottom }]}>
       <View style={styles.toolbar}>
         <View style={styles.viewToggle}>
           <View style={[styles.toggleBtn, styles.toggleActive]}>
@@ -155,7 +157,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: space.margin, gap: space.md, paddingBottom: space.xl },
+  content: { padding: space.margin, gap: space.md },
   toolbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   viewToggle: {
     flexDirection: "row",

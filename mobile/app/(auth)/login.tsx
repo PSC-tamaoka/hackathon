@@ -383,24 +383,6 @@ export default function LoginScreen() {
               </AppText>
             </View>
           </View>
-
-          <View style={styles.micro}>
-            <Image source={{ uri: images.loginCard }} style={styles.microImg} contentFit="cover" />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <Icon name="nature-people" size={14} color={colors.tertiary} />
-                <AppText variant="labelSm" color={colors.tertiary}>
-                  渋川の風を感じて
-                </AppText>
-              </View>
-              <AppText variant="bodySm" numberOfLines={1}>
-                カッター訓練棟や青松白砂の海岸線。
-              </AppText>
-              <AppText variant="labelSm" color={colors.onSurfaceVariant}>
-                あなたの足跡が次のクエストになります
-              </AppText>
-            </View>
-          </View>
         </View>
       </ScrollView>
 
@@ -602,15 +584,6 @@ const styles = StyleSheet.create({
     gap: 4,
     elevation: 4,
   },
-  micro: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space.md,
-    padding: space.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceContainer,
-  },
-  microImg: { width: 64, height: 64, borderRadius: radius.md },
   option: {
     minHeight: 48,
     flexDirection: "row",

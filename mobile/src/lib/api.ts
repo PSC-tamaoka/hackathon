@@ -193,7 +193,13 @@ export async function signIn(email: string, password: string): Promise<void> {
 
 export async function signOut(): Promise<void> {
   if (isMock) return;
-  await client().auth.signOut();
+  const auth = client().auth;
+  const { error } = await auth.signOut({ scope: "local" });
+  if (!error) return;
+  // 通信エラーでも Supabase が端末のセッションを破棄する場合がある。
+  // 破棄済みなら完了とし、ログイン画面へ戻れるようにする。
+  const { data, error: sessionError } = await auth.getSession();
+  if (sessionError || data.session) throw new Error(authMessage(error.message));
 }
 
 export async function getSession(): Promise<Session | null> {

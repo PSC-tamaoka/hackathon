@@ -17,8 +17,7 @@
 | イベント作成 O-02(管理者のみ。ホーム右下のFABから開く) | `app/organizer/new.tsx` + `src/components/EventForm.tsx` | `events` へ直接 insert |
 | 招待の設定 O-03(招待リンク・QR・全体招待メールの状況) | `app/organizer/[id]/invite.tsx` | `create_invite_link` `get_invite_status` |
 | 招待ページ(招待リンク・QRを開いたとき。ログイン前でも見られる) | `app/invite/[token].tsx` | `get_invite` `apply_event` |
-| お知らせ(「準備中」表示) | `app/(tabs)/announcements.tsx` | — |
-| マイページ(自分のプロフィール・ログアウト) | `app/(tabs)/mypage.tsx` | `users` を直接取得 |
+| ユーザー情報(上部ユーザーマークから開くシート。名前・メールアドレス・ログアウト) | `src/components/ProfileMenu.tsx` | `users`・Supabase Auth |
 
 デザイン案が仕様書と違う点は、デザイン案を優先して作った(バックエンドもデザイン案に合わせた)。
 
@@ -35,7 +34,7 @@
 
 | ファイル | 作り方 |
 |---|---|
-| `package.json` `app.json` `tsconfig.json` | 作成済み(Expo SDK 58) |
+| `package.json` `app.json` `tsconfig.json` | 作成済み(Expo SDK 57) |
 | `eas.json` | `eas build:configure`(開発ビルド用。Androidは FCM の設定も) |
 | `.env` | `.env.example` をコピー(コミットしない) |
 
@@ -50,9 +49,8 @@
 | `app/(auth)/` | `_layout.tsx` ★ `login.tsx` ★ | P-01 ログイン・新規登録 |
 | `app/(onboarding)/` | `_layout.tsx` ★ `profile.tsx` ★ | P-02 初回プロフィール・渋川経験 |
 | `app/(onboarding)/` | `notification-permission.tsx` ★ | 通知許可の説明画面(P-02 の後) |
-| `app/(tabs)/` | `_layout.tsx` ★ | 下タブ(ホーム/お知らせ/マイページ) |
+| `app/(tabs)/` | `_layout.tsx` ★ | ホーム用レイアウト(下部バーなし) |
 | `app/(tabs)/` | `index.tsx` ★ | P-03 ホーム(月カレンダー) |
-| `app/(tabs)/` | `mypage.tsx` ★ | P-06 マイページ |
 | `app/events/[id]/` | `index.tsx` ★ | P-04 イベント詳細 |
 | `app/events/[id]/` | `apply.tsx` | P-05 申込フォーム(デザイン案では詳細画面の「出欠」シートで申し込むので不要) |
 | `app/events/[id]/` | `stamps.tsx` | P-07 スタンプ台紙(デザイン案では詳細画面の「当日のTODOリスト」に置き換え。不要) |
@@ -77,6 +75,7 @@
 | `Button.tsx` ★ | 大きめの共通ボタン(画面下に置く主操作用) |
 | `TextField.tsx` ★ | 共通入力欄(本文16px以上) |
 | `CreateEventFab.tsx` ★ | 管理者(is_admin)のときだけ出るホーム右下の作成ボタン |
+| `ProfileMenu.tsx` ★ | 共通ヘッダーのユーザーマーク・簡易ユーザー情報・ログアウト |
 | `EventCalendar.tsx` ★ | 月カレンダー+ドット(react-native-calendars) |
 | `EventPickerSheet.tsx` ★ | 同日に複数イベントがあるときの下から出るシート |
 | `EventCard.tsx` ★ | イベントの要約表示 |
@@ -97,7 +96,7 @@
 | `useEvent.ts` ★ | イベント1件(残席・自分の出欠・TODOのチェックを含む。作成済み) |
 | `useRallyProgress.ts` ★ | ログインユーザー・イベントごとのラリー進捗の取得と達成保存 |
 | `useRallyPeriod.ts` ★ | 日本時間の開始時刻・翌々日0時で表示を切り替える |
-| `useProfile.ts` | 自分のプロフィール(マイページ用) |
+| `useProfile.ts` | 自分のプロフィール・認証ユーザー情報・管理者判定 |
 | `useOrganizerEvents.ts` | 自分が作ったイベント(主催者ダッシュボード用) |
 
 申込・招待リンクの取得は `lib/api.ts` の関数を画面から直接呼ぶ。ラリー進捗の読み直し・達成保存・二重操作の制御は `useRallyProgress` にまとめる。

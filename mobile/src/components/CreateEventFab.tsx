@@ -1,5 +1,6 @@
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useProfile } from "@/src/hooks/useProfile";
 import { colors, space } from "@/src/constants/theme";
 import { Icon } from "./Icon";
@@ -7,6 +8,7 @@ import { Icon } from "./Icon";
 /** 管理者(is_admin=true)のときだけ出るホーム右下の作成ボタン */
 export function CreateEventFab() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { isAdmin, loading } = useProfile();
 
   if (loading || !isAdmin) return null;
@@ -16,7 +18,7 @@ export function CreateEventFab() {
       accessibilityLabel="イベントを作成"
       accessibilityRole="button"
       onPress={() => router.push("/organizer/new")}
-      style={styles.fab}
+      style={[styles.fab, { bottom: space.lg + insets.bottom }]}
     >
       <Icon name="add" size={28} color={colors.onPrimary} />
     </Pressable>
@@ -27,7 +29,6 @@ const styles = StyleSheet.create({
   fab: {
     position: "absolute",
     right: space.margin,
-    bottom: space.lg,
     width: 56,
     height: 56,
     borderRadius: 28,
