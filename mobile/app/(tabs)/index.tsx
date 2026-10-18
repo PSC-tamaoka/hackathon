@@ -130,26 +130,6 @@ export default function HomeScreen() {
         </View>
       )}
 
-      <View style={styles.banner}>
-        <View style={styles.bannerLeft}>
-          <View style={styles.bannerIcon}>
-            <Icon name="add-task" size={20} color={colors.onPrimary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <AppText variant="labelLg" color={colors.onPrimaryFixed} style={{ fontFamily: "PlusJakartaSans_700Bold" }}>
-              同窓会や同期会を企画しませんか？
-            </AppText>
-            <AppText variant="bodySm" color={colors.onSurfaceVariant}>
-              幹事サポート・出欠管理もワンタップ
-            </AppText>
-          </View>
-        </View>
-        <Pressable accessibilityRole="button" onPress={() => router.push("/organizer/new")} style={styles.bannerBtn}>
-          <AppText variant="labelMd" color={colors.primary}>
-            新規作成
-          </AppText>
-        </Pressable>
-      </View>
       </ScrollView>
       <CreateEventFab />
     </>
@@ -192,31 +172,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: space.lg,
     alignItems: "center",
-  },
-  banner: {
-    backgroundColor: colors.primaryFixed,
-    borderRadius: radius.md,
-    padding: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  bannerLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
-  bannerIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  bannerBtn: {
-    minHeight: 44,
-    paddingHorizontal: 14,
-    borderRadius: radius.full,
-    backgroundColor: colors.surfaceContainerLowest,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });
